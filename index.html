@@ -273,8 +273,10 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
       </div>
       <div class="cc col4" id="card-exp" onclick="showDetail('exp')">
         <div class="cc-title">Expense by Category <span class="cc-hint">click ↓</span></div>
-        <div class="leg" id="exp-leg"></div>
-        <div class="cw" style="height:75px"><canvas id="expChart"></canvas></div>
+        <div style="display:flex;gap:8px;align-items:center;height:110px">
+          <div style="flex-shrink:0;width:110px;height:110px;position:relative"><canvas id="expChart"></canvas></div>
+          <div class="leg" id="exp-leg" style="flex:1;display:flex;flex-direction:column;gap:3px;margin:0;overflow:hidden"></div>
+        </div>
       </div>
       <div class="cc col4" id="card-expbar" onclick="showDetail('expbar')">
         <div class="cc-title">Expense by Type — Bar <span class="cc-hint">click ↓</span></div>
@@ -789,11 +791,23 @@ function renderExpDaily(expItems){
 function renderExpChart(ec){
   const entries=Object.entries(ec||{}).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]).slice(0,8);
   const lbs=entries.map(e=>e[0]),vals=entries.map(e=>e[1]),colors=EXP_COLORS.slice(0,lbs.length),tot=vals.reduce((s,v)=>s+v,0);
-  document.getElementById('exp-leg').innerHTML=lbs.slice(0,5).map((l,i)=>`<div class="li"><span class="ld" style="background:${colors[i]}"></span><span>${l}</span></div>`).join('');
+  // Side legend — compact with % 
+  document.getElementById('exp-leg').innerHTML=lbs.map((l,i)=>`
+    <div class="li" style="gap:5px;white-space:nowrap;overflow:hidden">
+      <span class="ld" style="background:${colors[i]};flex-shrink:0"></span>
+      <span style="overflow:hidden;text-overflow:ellipsis;font-size:9.5px">${l}</span>
+      <span style="margin-left:auto;flex-shrink:0;font-size:9px;color:var(--t3)">${tot>0?Math.round(vals[i]/tot*100):0}%</span>
+    </div>`).join('');
   destroy('expChart');
   charts['expChart']=new Chart(document.getElementById('expChart'),{
-    type:'doughnut',data:{labels:lbs,datasets:[{data:vals,backgroundColor:colors,borderWidth:0}]},
-    options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': ₹'+c.raw.toLocaleString('en-IN')+' ('+Math.round(c.raw/tot*100)+'%)'}}}}
+    type:'pie',
+    data:{labels:lbs,datasets:[{data:vals,backgroundColor:colors,borderWidth:1,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:true,
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label:c=>c.label+': ₹'+c.raw.toLocaleString('en-IN')+' ('+Math.round(c.raw/tot*100)+'%)'}}
+      }
+    }
   });
 }
 

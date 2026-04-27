@@ -3,1024 +3,830 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sadhana — Business Dashboard</title>
+<title>Sadhana Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#F7F5F0;--surface:#fff;--s2:#F0EDE6;--border:rgba(0,0,0,0.08);--text:#1A1814;--t2:#6B6660;--t3:#9E9993;--accent:#C4623A;--green:#2D6A4F;--blue:#1B4F8A;--r:10px}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);font-size:13px;line-height:1.5;min-height:100vh;overflow:hidden}
 
-  :root {
-    --bg: #F7F5F0;
-    --surface: #FFFFFF;
-    --surface2: #F0EDE6;
-    --border: rgba(0,0,0,0.08);
-    --text: #1A1814;
-    --text2: #6B6660;
-    --text3: #9E9993;
-    --accent: #C4623A;
-    --accent2: #2D6A4F;
-    --accent3: #1B4F8A;
-    --gold: #B8862A;
-    --radius: 12px;
-    --radius-sm: 8px;
-  }
+/* UPLOAD */
+#upload-screen{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem;gap:1.4rem;overflow:auto}
+.brand h1{font-family:'DM Serif Display',serif;font-size:3rem;letter-spacing:-.02em;text-align:center;line-height:1}
+.brand h1 em{color:var(--accent);font-style:italic}
+.brand p{color:var(--t2);font-size:.9rem;text-align:center;margin-top:.4rem;font-weight:300}
 
-  body {
-    font-family: 'DM Sans', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-    font-size: 14px;
-    line-height: 1.6;
-  }
+/* Google Drive load card */
+.gdrive-card{width:100%;max-width:400px;background:var(--surface);border:1.5px solid var(--accent);border-radius:14px;padding:1.4rem 1.6rem;display:flex;flex-direction:column;gap:.8rem}
+.gdrive-card .gc-top{display:flex;align-items:center;gap:10px}
+.gc-icon{width:38px;height:38px;border-radius:10px;background:#E8F0FE;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.gc-icon svg{width:20px;height:20px}
+.gc-label{font-size:.85rem;font-weight:500;color:var(--text)}
+.gc-sub{font-size:.72rem;color:var(--t3);margin-top:1px}
+.gc-status{font-size:.75rem;padding:4px 10px;border-radius:20px;background:var(--s2);color:var(--t2);display:inline-flex;align-items:center;gap:5px;width:fit-content}
+.gc-status .dot{width:6px;height:6px;border-radius:50%;background:var(--t3)}
+.gc-status.loading .dot{background:#B8862A;animation:pulse 1s infinite}
+.gc-status.ok .dot{background:var(--green)}
+.gc-status.err .dot{background:#B53C3C}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.btn-gdrive{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:8px 18px;font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:500;cursor:pointer;transition:.15s;align-self:flex-start}
+.btn-gdrive:hover{background:#A04E2A}
+.btn-gdrive:disabled{opacity:.5;cursor:not-allowed}
 
-  /* ── UPLOAD SCREEN ── */
-  #upload-screen {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 2rem;
-    gap: 2rem;
-  }
+.divider{display:flex;align-items:center;gap:.8rem;width:100%;max-width:400px}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border)}
+.divider span{font-size:.72rem;color:var(--t3);white-space:nowrap}
 
-  .brand {
-    text-align: center;
-  }
+.drop-zone{width:100%;max-width:400px;border:1.5px dashed var(--border);border-radius:14px;padding:1.4rem 2rem;text-align:center;cursor:pointer;background:var(--surface);transition:.2s;position:relative}
+.drop-zone:hover,.drop-zone.drag-over{background:#FDF5F0;border-color:var(--accent)}
+.drop-icon{width:38px;height:38px;background:var(--s2);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto .6rem}
+.drop-icon svg{width:18px;height:18px;stroke:var(--t2);fill:none;stroke-width:1.5}
+.drop-zone h3{font-size:.85rem;font-weight:500;margin-bottom:.15rem;color:var(--t2)}
+.drop-zone p{font-size:.7rem;color:var(--t3)}
+#file-input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.tips{display:flex;flex-wrap:wrap;gap:.8rem;justify-content:center;max-width:400px}
+.tip{display:flex;align-items:flex-start;gap:6px;font-size:.72rem;color:var(--t2)}
+.tip-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);margin-top:4px;flex-shrink:0}
 
-  .brand h1 {
-    font-family: 'DM Serif Display', serif;
-    font-size: 3.5rem;
-    color: var(--text);
-    letter-spacing: -0.02em;
-    line-height: 1;
-  }
+/* APP SHELL */
+#app{display:none;flex-direction:column;height:100vh;overflow:hidden}
 
-  .brand h1 em {
-    color: var(--accent);
-    font-style: italic;
-  }
+/* HEADER */
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 1.2rem;display:flex;align-items:center;justify-content:space-between;height:44px;flex-shrink:0}
+.hbrand{font-family:'DM Serif Display',serif;font-size:1.15rem}
+.hbrand span{color:var(--accent);font-style:italic}
+.hright{display:flex;align-items:center;gap:8px}
+.fname{font-size:10px;color:var(--t3);background:var(--s2);padding:2px 8px;border-radius:20px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.btn-sm{background:none;border:1px solid var(--border);border-radius:6px;padding:3px 10px;font-family:'DM Sans',sans-serif;font-size:11px;color:var(--t2);cursor:pointer;transition:.15s}
+.btn-sm:hover{background:var(--s2);color:var(--text)}
+.btn-refresh{background:none;border:1px solid var(--border);border-radius:6px;padding:3px 10px;font-family:'DM Sans',sans-serif;font-size:11px;color:var(--green);cursor:pointer;transition:.15s;display:flex;align-items:center;gap:4px}
+.btn-refresh:hover{background:#EAF3EE;color:var(--green)}
+.btn-refresh.spinning svg{animation:spin .7s linear infinite}
+.gsrc-badge{font-size:9px;color:var(--t3);background:var(--s2);padding:2px 7px;border-radius:20px;display:flex;align-items:center;gap:4px}
+.gsrc-badge .gdot{width:5px;height:5px;border-radius:50%;background:var(--green)}
 
-  .brand p {
-    color: var(--text2);
-    font-size: 1rem;
-    margin-top: 0.5rem;
-    font-weight: 300;
-  }
+/* FILTER BAR */
+.fbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 1.2rem;display:flex;align-items:center;overflow-x:auto;flex-shrink:0;height:36px;-webkit-overflow-scrolling:touch}
+.fgrp{display:flex;align-items:center;border-right:1px solid var(--border);padding-right:.8rem;margin-right:.8rem;gap:3px;height:100%;flex-shrink:0}
+.fgrp:last-child{border-right:none}
+.fgrp label{font-size:10px;color:var(--t3);margin-right:4px;white-space:nowrap}
+.fpill{padding:2px 10px;border-radius:20px;border:1px solid transparent;background:none;font-family:'DM Sans',sans-serif;font-size:11px;color:var(--t2);cursor:pointer;transition:.15s;white-space:nowrap}
+.fpill:hover{background:var(--s2);color:var(--text)}
+.fpill.active{background:var(--accent);color:#fff;border-color:var(--accent)}
 
-  .upload-zone {
-    width: 100%;
-    max-width: 480px;
-    border: 1.5px dashed var(--accent);
-    border-radius: 16px;
-    padding: 3rem 2rem;
-    text-align: center;
-    cursor: pointer;
-    background: var(--surface);
-    transition: background 0.2s, border-color 0.2s;
-    position: relative;
-  }
+/* BODY */
+.body-wrap{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0}
 
-  .upload-zone:hover, .upload-zone.drag-over {
-    background: #FDF5F0;
-    border-color: #A04E2A;
-  }
+/* DASHBOARD GRID */
+.dgrid{padding:.7rem 1.2rem .4rem;display:grid;grid-template-columns:repeat(12,1fr);gap:7px;flex-shrink:0}
 
-  .upload-icon {
-    width: 52px; height: 52px;
-    background: #FDF5F0;
-    border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    margin: 0 auto 1rem;
-  }
+/* KPI row */
+.kpi-row{grid-column:1/-1;display:grid;grid-template-columns:repeat(6,1fr);gap:7px}
+.kpi{background:var(--surface);border-radius:var(--r);padding:8px 11px;border:1px solid var(--border);border-top:3px solid var(--kc,var(--accent));cursor:pointer;transition:.15s;position:relative}
+.kpi:hover,.kpi.active{box-shadow:0 0 0 2px var(--kc,var(--accent))}
+.kpi-lbl{font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
+.kpi-val{font-size:1rem;font-weight:600;line-height:1.1}
+.kpi-val.neg{color:#B53C3C}
+.kpi-val.pos{color:var(--green)}
+.kpi-sub{font-size:9px;color:var(--t3);margin-top:1px}
 
-  .upload-icon svg { width: 24px; height: 24px; stroke: var(--accent); fill: none; stroke-width: 1.5; }
+/* chart cards */
+.cc{background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:9px 11px;cursor:pointer;transition:.15s;position:relative}
+.cc:hover{box-shadow:0 2px 8px rgba(0,0,0,0.08)}
+.cc.active{box-shadow:0 0 0 2.5px var(--accent);border-color:var(--accent)}
+.cc.col3{grid-column:span 3}
+.cc.col4{grid-column:span 4}
+.cc.col6{grid-column:span 6}
+.cc-title{font-size:9.5px;font-weight:500;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;display:flex;align-items:center;justify-content:space-between}
+.cc-hint{font-size:9px;color:var(--t3);font-weight:400;text-transform:none;letter-spacing:0}
+.cw{position:relative;width:100%}
 
-  .upload-zone h3 { font-size: 1rem; font-weight: 500; color: var(--text); margin-bottom: 0.25rem; }
-  .upload-zone p { font-size: 0.8rem; color: var(--text3); }
+/* DETAIL PANEL */
+.detail-panel{flex:1;overflow-y:auto;border-top:2px solid var(--border);background:var(--bg);min-height:0}
+.detail-panel::-webkit-scrollbar{width:4px}
+.detail-panel::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.12);border-radius:4px}
+.di{padding:.8rem 1.2rem 2rem;max-width:1200px;margin:0 auto}
+.dtitle{font-family:'DM Serif Display',serif;font-size:.95rem;margin-bottom:.7rem;display:flex;align-items:center;gap:8px}
+.dtitle .badge{font-family:'DM Sans',sans-serif;font-size:10px;background:var(--s2);color:var(--t2);padding:2px 8px;border-radius:20px;font-style:normal}
+.empty{display:flex;align-items:center;justify-content:center;height:80px;color:var(--t3);font-size:.8rem;gap:6px}
 
-  #file-input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+/* TABLE */
+.tw{overflow-x:auto}
+.dt{width:100%;border-collapse:collapse;font-size:12px}
+.dt th{font-size:10px;font-weight:500;color:var(--t3);text-align:right;padding:6px 10px;border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+.dt th:first-child{text-align:left}
+.dt td{padding:7px 10px;border-bottom:1px solid var(--border);text-align:right;color:var(--text)}
+.dt td:first-child{text-align:left;color:var(--t2);font-weight:500}
+.dt tr:last-child td{border-bottom:none;font-weight:600;color:var(--text)}
+.dt .pos{color:var(--green)}.dt .neg{color:#B53C3C}.dt .best{color:var(--green);font-weight:500}
 
-  .tip-list {
-    display: flex; gap: 1.5rem; flex-wrap: wrap; justify-content: center;
-    max-width: 480px;
-  }
+/* legend */
+.leg{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px}
+.li{display:flex;align-items:center;gap:4px;font-size:9.5px;color:var(--t2)}
+.ld{width:7px;height:7px;border-radius:2px;flex-shrink:0}
 
-  .tip {
-    display: flex; align-items: flex-start; gap: 8px;
-    font-size: 0.78rem; color: var(--text2);
-  }
+/* loading */
+#loading{display:none;position:fixed;inset:0;background:rgba(247,245,240,.85);z-index:999;align-items:center;justify-content:center;flex-direction:column;gap:.8rem;font-family:'DM Serif Display',serif;font-size:1.1rem;color:var(--text)}
+.spin{width:30px;height:30px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fu{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.fade{animation:fu .25s ease both}
 
-  .tip-dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: var(--accent); margin-top: 5px; flex-shrink: 0;
-  }
-
-  /* ── DASHBOARD SCREEN ── */
-  #dashboard-screen { display: none; }
-
-  header {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 0 2rem;
-    display: flex; align-items: center; justify-content: space-between;
-    height: 60px;
-    position: sticky; top: 0; z-index: 100;
-  }
-
-  .header-brand {
-    font-family: 'DM Serif Display', serif;
-    font-size: 1.4rem;
-    color: var(--text);
-  }
-  .header-brand span { color: var(--accent); font-style: italic; }
-
-  .header-right { display: flex; align-items: center; gap: 12px; }
-
-  .btn-upload-new {
-    background: none;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 6px 14px;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 12px;
-    color: var(--text2);
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-  .btn-upload-new:hover { background: var(--surface2); color: var(--text); }
-
-  .file-name {
-    font-size: 11px;
-    color: var(--text3);
-    background: var(--surface2);
-    padding: 4px 10px;
-    border-radius: 20px;
-  }
-
-  /* ── FILTER BAR ── */
-  .filter-bar {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 0 2rem;
-    display: flex; align-items: center; gap: 0;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .filter-group {
-    display: flex; align-items: center;
-    border-right: 1px solid var(--border);
-    padding: 0 1.5rem 0 0;
-    margin-right: 1.5rem;
-    gap: 4px;
-  }
-
-  .filter-group:last-child { border-right: none; }
-  .filter-group label { font-size: 11px; color: var(--text3); margin-right: 6px; white-space: nowrap; }
-
-  .filter-pill {
-    padding: 5px 14px;
-    border-radius: 20px;
-    border: 1px solid transparent;
-    background: none;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 12px;
-    color: var(--text2);
-    cursor: pointer;
-    transition: all 0.15s;
-    white-space: nowrap;
-    height: 44px;
-  }
-
-  .filter-pill:hover { color: var(--text); background: var(--surface2); }
-  .filter-pill.active {
-    background: var(--accent);
-    color: white;
-    border-color: var(--accent);
-  }
-
-  /* ── MAIN CONTENT ── */
-  .dash-content {
-    padding: 1.5rem 2rem 3rem;
-    max-width: 1200px;
-    margin: 0 auto;
-  }
-
-  .section-header {
-    display: flex; align-items: baseline; justify-content: space-between;
-    margin-bottom: 1rem;
-  }
-
-  .section-title {
-    font-family: 'DM Serif Display', serif;
-    font-size: 1.1rem;
-    color: var(--text);
-  }
-
-  .section-meta { font-size: 11px; color: var(--text3); }
-
-  /* ── KPI GRID ── */
-  .kpi-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 12px;
-    margin-bottom: 1.5rem;
-  }
-
-  .kpi {
-    background: var(--surface);
-    border-radius: var(--radius);
-    padding: 16px 18px;
-    border: 1px solid var(--border);
-    position: relative;
-    overflow: hidden;
-  }
-
-  .kpi::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 3px;
-    background: var(--kpi-color, var(--accent));
-  }
-
-  .kpi-label { font-size: 11px; color: var(--text3); font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
-  .kpi-value { font-size: 1.5rem; font-weight: 600; color: var(--text); line-height: 1.1; }
-  .kpi-value.neg { color: #B53C3C; }
-  .kpi-value.pos { color: var(--accent2); }
-  .kpi-sub { font-size: 11px; color: var(--text3); margin-top: 4px; }
-
-  /* ── CARDS ── */
-  .card {
-    background: var(--surface);
-    border-radius: var(--radius);
-    border: 1px solid var(--border);
-    padding: 18px 20px;
-    margin-bottom: 1rem;
-  }
-
-  .card-title {
-    font-size: 12px; font-weight: 500; color: var(--text2);
-    text-transform: uppercase; letter-spacing: 0.06em;
-    margin-bottom: 14px;
-  }
-
-  .chart-wrap { position: relative; width: 100%; }
-
-  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
-  @media (max-width: 640px) { .two-col { grid-template-columns: 1fr; } }
-
-  /* ── TREND TABLE ── */
-  .trend-table-wrap { overflow-x: auto; }
-  .trend-table {
-    width: 100%; border-collapse: collapse;
-    font-size: 12px;
-  }
-  .trend-table th {
-    font-weight: 500; color: var(--text3); text-align: right;
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--border);
-    white-space: nowrap;
-    font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
-  }
-  .trend-table th:first-child { text-align: left; }
-  .trend-table td {
-    padding: 10px 12px; text-align: right;
-    border-bottom: 1px solid var(--border);
-    color: var(--text);
-  }
-  .trend-table td:first-child { text-align: left; color: var(--text2); font-weight: 500; }
-  .trend-table tr:last-child td { border-bottom: none; font-weight: 600; }
-  .trend-table .neg { color: #B53C3C; }
-  .trend-table .pos { color: var(--accent2); }
-
-  /* ── LEGEND ── */
-  .legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
-  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text2); }
-  .legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
-
-  /* ── LOADING ── */
-  #loading {
-    display: none;
-    position: fixed; inset: 0;
-    background: rgba(247,245,240,0.85);
-    z-index: 999;
-    align-items: center; justify-content: center;
-    flex-direction: column; gap: 1rem;
-    font-family: 'DM Serif Display', serif;
-    font-size: 1.2rem;
-    color: var(--text);
-  }
-
-  .spinner {
-    width: 36px; height: 36px;
-    border: 2px solid var(--border);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  .no-data {
-    text-align: center;
-    padding: 3rem 1rem;
-    color: var(--text3);
-    font-size: 0.9rem;
-  }
-
-  /* fade-in */
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(12px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  .fade-up { animation: fadeUp 0.35s ease both; }
-
-  /* scrollbar */
-  ::-webkit-scrollbar { width: 5px; height: 5px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+/* responsive */
+@media(max-width:900px){
+  .kpi-row{grid-template-columns:repeat(3,1fr)}
+  .dgrid{grid-template-columns:repeat(6,1fr)}
+  .cc.col3{grid-column:span 3}.cc.col4{grid-column:span 6}.cc.col6{grid-column:span 6}
+}
+@media(max-width:580px){
+  body{overflow:auto}
+  #app{height:auto;overflow:visible}
+  .body-wrap{overflow:visible}
+  .dgrid{grid-template-columns:1fr 1fr}
+  .kpi-row{grid-template-columns:repeat(2,1fr)}
+  .cc.col3,.cc.col4,.cc.col6{grid-column:span 2}
+  .detail-panel{height:auto;overflow:visible}
+}
 </style>
 </head>
 <body>
 
-<!-- UPLOAD SCREEN -->
+<!-- UPLOAD -->
 <div id="upload-screen">
   <div class="brand">
     <h1>Sadhana <em>Dashboard</em></h1>
-    <p>Upload your master file to explore monthly, quarterly &amp; yearly insights</p>
+    <p>Loads automatically from Google Drive · or upload a local file</p>
   </div>
 
-  <div class="upload-zone" id="drop-zone">
-    <input type="file" id="file-input" accept=".xlsx,.xls">
-    <div class="upload-icon">
-      <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+  <!-- Google Drive auto-load card -->
+  <div class="gdrive-card">
+    <div class="gc-top">
+      <div class="gc-icon">
+        <svg viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+          <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
+          <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/>
+          <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/>
+          <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
+          <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
+          <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 27h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
+        </svg>
+      </div>
+      <div>
+        <div class="gc-label">Sadhana Master 2026</div>
+        <div class="gc-sub">Google Drive · auto-loads on open</div>
+      </div>
     </div>
-    <h3>Drop your Excel file here</h3>
+    <div class="gc-status" id="gd-status"><span class="dot"></span><span id="gd-status-text">Ready to load</span></div>
+    <button class="btn-gdrive" id="btn-gd-load" onclick="loadFromGDrive()">
+      Load from Google Drive
+    </button>
+    <!-- Sharing instructions (shown only when load fails) -->
+    <div id="share-help" style="display:none;background:#FFF8F0;border:1px solid #F0D5C0;border-radius:8px;padding:10px 12px;font-size:.72rem;color:#7A4020;line-height:1.7">
+      ⚠️ <b>File must be publicly shared to load automatically.</b><br>
+      In Google Drive: right-click file → <b>Share</b> → <b>Anyone with the link</b> → set to <b>Viewer</b> → Save.<br>
+      Then click <em>Load from Google Drive</em> again.
+    </div>
+  </div>
+
+  <div class="divider"><span>or upload a local file</span></div>
+
+  <!-- Manual upload -->
+  <div class="drop-zone" id="drop-zone">
+    <input type="file" id="file-input" accept=".xlsx,.xls">
+    <div class="drop-icon"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+    <h3>Drop Excel file here · or click to browse</h3>
     <p>Sadhana_Master_2026.xlsx or any similar format</p>
   </div>
 
-  <div class="tip-list">
-    <div class="tip"><div class="tip-dot"></div><span>Works with monthly sheets like "Nov 2025", "Jan 2026", "March 2026"</span></div>
-    <div class="tip"><div class="tip-dot"></div><span>No data leaves your browser — everything runs locally</span></div>
-    <div class="tip"><div class="tip-dot"></div><span>Filter by month, quarter, or full year instantly</span></div>
+  <div class="tips">
+    <div class="tip"><div class="tip-dot"></div><span>Auto-reads all monthly sheets</span></div>
+    <div class="tip"><div class="tip-dot"></div><span>Month · Quarter · Yearly filters</span></div>
+    <div class="tip"><div class="tip-dot"></div><span>Click any chart for full detail</span></div>
   </div>
 </div>
 
 <!-- LOADING -->
-<div id="loading">
-  <div class="spinner"></div>
-  <span>Reading your file…</span>
-</div>
+<div id="loading"><div class="spin"></div><span>Reading file…</span></div>
 
-<!-- DASHBOARD -->
-<div id="dashboard-screen">
+<!-- APP -->
+<div id="app">
   <header>
-    <div class="header-brand">Sadhana <span>Dashboard</span></div>
-    <div class="header-right">
-      <span class="file-name" id="file-name-display">—</span>
-      <button class="btn-upload-new" onclick="resetToUpload()">Upload new file</button>
+    <div class="hbrand">Sadhana <span>Dashboard</span></div>
+    <div class="hright">
+      <div class="gsrc-badge" id="src-badge" style="display:none"><span class="gdot"></span><span id="src-label">Google Drive</span></div>
+      <span class="fname" id="fname">—</span>
+      <button class="btn-refresh" id="btn-refresh" onclick="refreshGDrive()" style="display:none" title="Refresh from Google Drive">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        Refresh
+      </button>
+      <button class="btn-sm" onclick="showUploadOption()">↑ Update file</button>
     </div>
   </header>
 
-  <div class="filter-bar" id="filter-bar">
-    <div class="filter-group">
+  <div class="fbar" id="fbar">
+    <div class="fgrp">
       <label>View</label>
-      <button class="filter-pill active" data-view="monthly">Monthly</button>
-      <button class="filter-pill" data-view="quarterly">Quarterly</button>
-      <button class="filter-pill" data-view="yearly">Yearly</button>
+      <button class="fpill active" data-view="monthly">Monthly</button>
+      <button class="fpill" data-view="quarterly">Quarterly</button>
+      <button class="fpill" data-view="yearly">Yearly</button>
     </div>
-    <div class="filter-group" id="month-filters" style="display:flex;"></div>
-    <div class="filter-group" id="quarter-filters" style="display:none;"></div>
+    <div class="fgrp" id="mf" style="display:flex"></div>
+    <div class="fgrp" id="qf" style="display:none"></div>
   </div>
 
-  <div class="dash-content">
-    <!-- KPIs -->
-    <div id="kpi-section" class="kpi-grid fade-up"></div>
+  <div class="body-wrap">
+    <div class="dgrid" id="dgrid">
+      <!-- KPIs -->
+      <div class="kpi-row" id="kpi-row"></div>
 
-    <!-- Main chart -->
-    <div class="card fade-up">
-      <div class="section-header">
-        <p class="card-title" id="main-chart-title">Daily profit</p>
-        <span class="section-meta" id="main-chart-meta"></span>
+      <!-- Chart cards row -->
+      <div class="cc col3" id="card-profit" onclick="showDetail('profit')">
+        <div class="cc-title">Profit <span class="cc-hint">click for detail ↓</span></div>
+        <div class="cw" style="height:100px"><canvas id="profitChart"></canvas></div>
       </div>
-      <div class="chart-wrap" style="height:220px;">
-        <canvas id="mainChart" role="img" aria-label="Daily profit chart"></canvas>
+      <div class="cc col3" id="card-trend" onclick="showDetail('trend')">
+        <div class="cc-title">Sale vs Expense Trend <span class="cc-hint">click ↓</span></div>
+        <div class="cw" style="height:100px"><canvas id="trendChart"></canvas></div>
+      </div>
+      <div class="cc col3" id="card-cash" onclick="showDetail('cash')">
+        <div class="cc-title">Cash vs Online <span class="cc-hint">click ↓</span></div>
+        <div class="cw" style="height:100px"><canvas id="cashChart"></canvas></div>
+      </div>
+      <div class="cc col3" id="card-week" onclick="showDetail('week')">
+        <div class="cc-title">Week-wise Sale & Profit <span class="cc-hint">click ↓</span></div>
+        <div class="cw" style="height:100px"><canvas id="weekChart"></canvas></div>
+      </div>
+      <div class="cc col4" id="card-exp" onclick="showDetail('exp')">
+        <div class="cc-title">Expense Categories <span class="cc-hint">click ↓</span></div>
+        <div class="leg" id="exp-leg"></div>
+        <div class="cw" style="height:75px"><canvas id="expChart"></canvas></div>
       </div>
     </div>
 
-    <!-- Two col -->
-    <div class="two-col fade-up">
-      <div class="card">
-        <p class="card-title">Cash vs online collection</p>
-        <div class="chart-wrap" style="height:200px;">
-          <canvas id="cashChart" role="img" aria-label="Cash vs online chart"></canvas>
-        </div>
-      </div>
-      <div class="card">
-        <p class="card-title">Expense categories</p>
-        <div id="exp-legend" class="legend"></div>
-        <div class="chart-wrap" style="height:160px;">
-          <canvas id="expChart" role="img" aria-label="Expense breakdown"></canvas>
-        </div>
+    <!-- DETAIL PANEL -->
+    <div class="detail-panel" id="detail-panel">
+      <div class="di" id="detail-inner">
+        <div class="empty">☝️ &nbsp;Click any chart or KPI card above to see full detail here</div>
       </div>
     </div>
+  </div>
+</div>
 
-    <!-- Summary table -->
-    <div class="card fade-up">
-      <p class="card-title" id="table-title">Monthly summary</p>
-      <div class="trend-table-wrap">
-        <table class="trend-table" id="summary-table"></table>
-      </div>
+<!-- UPLOAD OVERLAY (shown when user clicks "Update file" while in dashboard) -->
+<div id="upload-overlay" style="display:none;position:fixed;inset:0;background:rgba(26,24,20,0.55);z-index:200;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border-radius:16px;padding:2rem;max-width:380px;width:90%;display:flex;flex-direction:column;gap:1rem;box-shadow:0 20px 60px rgba(0,0,0,0.25)">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="font-family:'DM Serif Display',serif;font-size:1.1rem">Update Data Source</div>
+      <button onclick="closeOverlay()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--t3)">✕</button>
     </div>
-
-    <!-- Sale trend (multi-month / quarterly / yearly) -->
-    <div class="card fade-up" id="trend-card">
-      <p class="card-title" id="trend-title">Sale trend across months</p>
-      <div class="chart-wrap" style="height:200px;">
-        <canvas id="trendChart" role="img" aria-label="Sale trend chart"></canvas>
+    <!-- Reload from Drive -->
+    <div style="background:var(--s2);border-radius:10px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <div>
+        <div style="font-size:.82rem;font-weight:500">Reload from Google Drive</div>
+        <div style="font-size:.72rem;color:var(--t3);margin-top:2px">Sadhana_Master_2026 · always latest</div>
       </div>
+      <button onclick="loadFromGDrive(true)" class="btn-gdrive" style="white-space:nowrap;flex-shrink:0">Reload ↺</button>
+    </div>
+    <div class="divider"><span>or upload a local file</span></div>
+    <!-- File upload inside overlay -->
+    <div class="drop-zone" id="drop-zone-2" style="padding:1rem 1.5rem">
+      <input type="file" id="file-input-2" accept=".xlsx,.xls">
+      <div class="drop-icon" style="width:32px;height:32px;margin-bottom:.4rem"><svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:var(--t2);fill:none;stroke-width:1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+      <h3 style="font-size:.8rem">Drop file or click to browse</h3>
+      <p>.xlsx format</p>
     </div>
   </div>
 </div>
 
 <script>
-// ── DATA STORE ──
-let allData = {}; // { 'Nov 2025': { sale, expense, profit, mulbhag, cash, transfer, expCats, daily[] } }
-let charts = {};
-let currentView = 'monthly';
-let currentFilter = null;
+// ── STATE ──
+let allData={}, charts={}, currentView='monthly', currentFilter=null, activeDetail=null, dataSource='gdrive';
 
-const MONTH_ORDER = [
-  'Jan 2025','Feb 2025','Mar 2025','Apr 2025','May 2025','Jun 2025',
-  'Jul 2025','Aug 2025','Sep 2025','Oct 2025','Nov 2025','Dec 2025',
-  'Jan 2026','Feb 2026','Mar 2026','Apr 2026','May 2026','Jun 2026',
-  'Jul 2026','Aug 2026','Sep 2026','Oct 2026','Nov 2026','Dec 2026'
+const GDRIVE_FILE_ID = '1eW0-K4zR0eYmYc4eNi5LZE2jDZMQm8Hk';
+const GDRIVE_EXPORT  = `https://docs.google.com/spreadsheets/d/${GDRIVE_FILE_ID}/export?format=xlsx`;
+
+// Multiple CORS proxies — tries each in order until one works
+const PROXIES = [
+  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  url => `https://thingproxy.freeboard.io/fetch/${url}`,
+  url => `https://cors-anywhere.herokuapp.com/${url}`,
 ];
 
-const MONTH_ALIASES = {
-  'november 2025':'Nov 2025','nov 2025':'Nov 2025',
-  'december 2025':'Dec 2025','dec 2025':'Dec 2025',
-  'january 2026':'Jan 2026','jan 2026':'Jan 2026',
-  'february 2026':'Feb 2026','feb 2026':'Feb 2026',
-  'march 2026':'Mar 2026','mar 2026':'Mar 2026',
-  'april 2026':'Apr 2026','apr 2026':'Apr 2026',
-  'may 2026':'May 2026','june 2026':'Jun 2026','jun 2026':'Jun 2026',
-};
+const MONTH_ORDER=['Jan 2025','Feb 2025','Mar 2025','Apr 2025','May 2025','Jun 2025','Jul 2025','Aug 2025','Sep 2025','Oct 2025','Nov 2025','Dec 2025','Jan 2026','Feb 2026','Mar 2026','Apr 2026','May 2026','Jun 2026','Jul 2026','Aug 2026','Sep 2026','Oct 2026','Nov 2026','Dec 2026'];
+const EXP_COLORS=['#C4623A','#534AB7','#1D9E75','#B8862A','#D4537E','#378ADD','#639922','#888780','#D85A30','#AFA9EC'];
 
-const EXP_CATS = ['Bill','EMI','Transport','Rent','Salary','Hamali','Nasto','Material','Mulbhag','Return','Dharmesh','Matala Badhavana','Other'];
-const EXP_COLORS = ['#C4623A','#534AB7','#1D9E75','#B8862A','#D4537E','#378ADD','#639922','#888780','#6B6660','#D85A30','#AFA9EC','#5DCAA5','#B4B2A9'];
+// ── AUTO-LOAD ON PAGE OPEN ──
+window.addEventListener('DOMContentLoaded', ()=>{
+  // Show loading spinner immediately — don't show upload screen yet
+  document.getElementById('upload-screen').style.display='none';
+  document.getElementById('loading').style.display='flex';
+  setLoadingText('Loading from Google Drive…');
+  setGDStatus('loading','Connecting to Google Drive…');
+  loadFromGDrive(false);
+});
 
-// ── FILE UPLOAD ──
-const dropZone = document.getElementById('drop-zone');
-const fileInput = document.getElementById('file-input');
+async function loadFromGDrive(fromOverlay=false){
+  setGDStatus('loading','Loading from Google Drive…');
+  setLoadingText('Loading from Google Drive…');
+  document.getElementById('loading').style.display='flex';
+  if(fromOverlay) closeOverlay();
 
-dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); if (e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]); });
-fileInput.addEventListener('change', e => { if (e.target.files[0]) processFile(e.target.files[0]); });
+  let arrayBuf = null;
+  let lastErr  = null;
 
-function processFile(file) {
-  document.getElementById('loading').style.display = 'flex';
-  document.getElementById('file-name-display').textContent = file.name;
-  const reader = new FileReader();
-  reader.onload = e => {
-    try {
-      const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
-      parseWorkbook(wb);
-      showDashboard();
-    } catch(err) {
-      alert('Could not read file. Please ensure it is a valid Excel workbook.');
-      console.error(err);
+  // 1️⃣ Try direct (works if browser allows cross-origin or file is on same origin)
+  try {
+    const res = await Promise.race([
+      fetch(GDRIVE_EXPORT, {mode:'cors'}),
+      new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),5000))
+    ]);
+    if(res.ok){
+      const ct = res.headers.get('content-type')||'';
+      if(!ct.includes('text/html')) { arrayBuf = await res.arrayBuffer(); }
     }
-    document.getElementById('loading').style.display = 'none';
-  };
-  reader.readAsArrayBuffer(file);
+  } catch(e){ lastErr=e; }
+
+  // 2️⃣ Try each CORS proxy in sequence
+  if(!arrayBuf){
+    for(const makeUrl of PROXIES){
+      try{
+        setLoadingText('Connecting… (trying alternate route)');
+        const res = await Promise.race([
+          fetch(makeUrl(GDRIVE_EXPORT)),
+          new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),8000))
+        ]);
+        if(res.ok){
+          const buf = await res.arrayBuffer();
+          // Sanity check: xlsx files start with PK (0x50 0x4B)
+          const header = new Uint8Array(buf.slice(0,2));
+          if(header[0]===0x50 && header[1]===0x4B){ arrayBuf=buf; break; }
+        }
+      }catch(e){ lastErr=e; }
+    }
+  }
+
+  document.getElementById('loading').style.display='none';
+
+  if(arrayBuf){
+    try{
+      const wb = XLSX.read(arrayBuf,{type:'array',cellDates:true});
+      parseWB(wb);
+      dataSource='gdrive';
+      document.getElementById('fname').textContent='Sadhana_Master_2026';
+      document.getElementById('src-badge').style.display='flex';
+      document.getElementById('src-label').textContent='Google Drive';
+      document.getElementById('btn-refresh').style.display='flex';
+      setGDStatus('ok','Loaded · '+new Date().toLocaleTimeString());
+      showApp();
+    }catch(parseErr){
+      console.error('Parse error:',parseErr);
+      showGDriveError('File downloaded but could not be parsed. Please try uploading manually.');
+    }
+  } else {
+    console.error('All fetch attempts failed:',lastErr);
+    showGDriveError('Could not reach Google Drive. Make sure the file is shared as "Anyone with the link".');
+  }
 }
 
-function parseWorkbook(wb) {
-  allData = {};
-  const monthRegex = /^(jan|feb|mar|march|apr|may|jun|jul|aug|sep|oct|nov|dec|january|february|march|april|june|july|august|september|october|november|december)\s*\d{4}$/i;
+function showGDriveError(msg){
+  setGDStatus('err', msg);
+  document.getElementById('share-help').style.display='block';
+  document.getElementById('upload-screen').style.display='flex';
+  document.getElementById('app').style.display='none';
+  document.getElementById('loading').style.display='none';
+}
 
-  wb.SheetNames.forEach(sheetName => {
-    const key = sheetName.toLowerCase().trim();
-    if (!monthRegex.test(key)) return;
-    if (/expense/i.test(key)) return;
+async function refreshGDrive(){
+  const btn=document.getElementById('btn-refresh');
+  btn.classList.add('spinning');
+  await loadFromGDrive(false);
+  btn.classList.remove('spinning');
+}
 
-    const ws = wb.Sheets[sheetName];
-    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, dateNF: 'yyyy-mm-dd' });
+function setGDStatus(type,msg){
+  const el=document.getElementById('gd-status');
+  if(!el)return;
+  el.className='gc-status '+type;
+  const t=document.getElementById('gd-status-text');
+  if(t)t.textContent=msg;
+}
 
-    // Find expense sheet
-    const expSheet = wb.SheetNames.find(s => {
-      const base = sheetName.replace(/\s+/g,'').toLowerCase();
-      const candidate = s.replace(/\s+/g,'').toLowerCase();
-      return candidate === base + 'expense' || candidate === base.replace('march','mar') + 'expense';
+function setLoadingText(t){
+  const s=document.querySelector('#loading span');
+  if(s)s.textContent=t;
+}
+
+// ── OVERLAY ──
+function showUploadOption(){document.getElementById('upload-overlay').style.display='flex';}
+function closeOverlay(){document.getElementById('upload-overlay').style.display='none';}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeOverlay();});
+
+// ── LOCAL FILE UPLOAD ──
+function wireDropZone(dzId,fiId){
+  const dz=document.getElementById(dzId),fi=document.getElementById(fiId);
+  if(!dz||!fi)return;
+  dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag-over')});
+  dz.addEventListener('dragleave',()=>dz.classList.remove('drag-over'));
+  dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag-over');if(e.dataTransfer.files[0])processFile(e.dataTransfer.files[0])});
+  fi.addEventListener('change',e=>{if(e.target.files[0])processFile(e.target.files[0])});
+}
+wireDropZone('drop-zone','file-input');
+wireDropZone('drop-zone-2','file-input-2');
+
+function processFile(file){
+  closeOverlay();
+  setLoadingText('Reading '+file.name+'…');
+  document.getElementById('loading').style.display='flex';
+  document.getElementById('fname').textContent=file.name;
+  const r=new FileReader();
+  r.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
+      parseWB(wb);
+      dataSource='local';
+      document.getElementById('src-badge').style.display='flex';
+      document.getElementById('src-label').textContent='Local file';
+      document.getElementById('btn-refresh').style.display='none';
+      showApp();
+    }catch(err){alert('Could not read file. Please check it is a valid .xlsx');console.error(err);}
+    document.getElementById('loading').style.display='none';
+  };
+  r.readAsArrayBuffer(file);
+}
+
+function resetToUpload(){
+  document.getElementById('app').style.display='none';
+  document.getElementById('upload-screen').style.display='flex';
+  allData={};Object.values(charts).forEach(c=>c.destroy());charts={};
+}
+
+// ── PARSE ──
+function parseWB(wb){
+  allData={};
+  const rx=/^(jan|feb|mar|march|apr|may|jun|jul|aug|sep|oct|nov|dec|january|february|april|june|july|august|september|october|november|december)\s*\d{4}$/i;
+  wb.SheetNames.forEach(name=>{
+    if(!/\d{4}/.test(name)||/expense/i.test(name)||!rx.test(name.trim())) return;
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,raw:false,dateNF:'yyyy-mm-dd'});
+    const expSheet=wb.SheetNames.find(s=>{
+      const a=s.replace(/\s/g,'').toLowerCase(),b=name.replace(/\s/g,'').toLowerCase();
+      return a===b+'expense'||a===b.replace('march','mar')+'expense';
     });
-
-    // Normalize month label
-    let label = sheetName.trim();
-    label = label.replace(/^march/i, 'Mar').replace(/^january/i,'Jan').replace(/^february/i,'Feb')
-                 .replace(/^april/i,'Apr').replace(/^november/i,'Nov').replace(/^december/i,'Dec');
-    // ensure "Mar 2026" style
-    if (/^Mar\s*2026/i.test(label)) label = 'Mar 2026';
-
-    const monthData = extractMonthData(rows, ws);
-
-    if (expSheet) {
-      const ews = wb.Sheets[expSheet];
-      const erows = XLSX.utils.sheet_to_json(ews, { header: 1, raw: false });
-      monthData.expCats = extractExpCats(erows);
-    }
-
-    if (monthData.sale > 0 || monthData.daily.length > 0) {
-      allData[label] = monthData;
-    }
+    const md=extractMonth(rows);
+    if(expSheet){const er=XLSX.utils.sheet_to_json(wb.Sheets[expSheet],{header:1,raw:false});md.expCats=extractExpCats(er);}
+    if(md.sale>0||md.daily.length>0) allData[normLabel(name)]=md;
   });
 }
 
-function extractMonthData(rows) {
-  const data = { sale: 0, expense: 0, profit: 0, mulbhag: 0, cash: 0, transfer: 0, expCats: {}, daily: [] };
-
-  // Scan for daily rows (rows with a date in col 0 and numeric profit in col 1)
-  for (let i = 1; i < Math.min(rows.length, 40); i++) {
-    const row = rows[i];
-    if (!row || !row[0]) continue;
-    const dateStr = String(row[0]);
-    if (!/\d{4}/.test(dateStr)) continue;
-
-    const profit = parseNum(row[1]);
-    const mulbhag = parseNum(row[2]);
-    const actual = parseNum(row[4]);
-    const total = parseNum(row[5]);
-    const cash = parseNum(row[6]);
-    const transfer = parseNum(row[7]);
-    const expense = parseNum(row[8]);
-
-    if (total === 0 && profit === 0 && cash === 0) continue;
-
-    let day = 0;
-    try {
-      if (dateStr.includes('-')) day = parseInt(dateStr.split('-')[2]) || (parseInt(dateStr.split('-')[1]) || 0);
-      else if (dateStr.includes('/')) day = parseInt(dateStr.split('/')[1]);
-    } catch(e) {}
-
-    if (day === 0) {
-      // Try to infer day from row position
-      day = data.daily.length + 1;
-    }
-
-    data.daily.push({ day, profit, mulbhag, actual, total, cash, transfer, expense });
-
-    data.profit += profit;
-    data.mulbhag += mulbhag;
-    data.cash += cash;
-    data.transfer += transfer;
-  }
-
-  // Extract totals from summary rows
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    if (!row) continue;
-    const c0 = String(row[0] || '').trim();
-    const c2 = String(row[2] || '').trim();
-    if (c0 === 'Sale' && row[1]) data.sale = parseNum(row[1]);
-    if ((c0 === 'Total' || c0 === 'Grand Total') && row[1] && i > 30 && i < 70) {
-      const v = parseNum(row[1]);
-      if (v > data.sale * 0.5 && data.sale === 0) data.sale = v;
-    }
-    if (c2 === 'Total' && row[3] && i > 40) {
-      const v = parseNum(row[3]);
-      if (v > 0) data.expense = v;
-    }
-    // Also check standalone totals
-    if (c0 === 'Total' && i === 33) {
-      if (parseNum(row[5]) > 0) data.sale = parseNum(row[5]);
-    }
-  }
-
-  // Fallback: compute sale from daily total column
-  if (data.sale === 0 && data.daily.length > 0) {
-    data.sale = data.daily.reduce((s, d) => s + d.total, 0);
-  }
-
-  return data;
+function normLabel(s){
+  return s.trim().replace(/^january/i,'Jan').replace(/^february/i,'Feb').replace(/^march/i,'Mar')
+    .replace(/^april/i,'Apr').replace(/^june/i,'Jun').replace(/^july/i,'Jul')
+    .replace(/^august/i,'Aug').replace(/^september/i,'Sep').replace(/^october/i,'Oct')
+    .replace(/^november/i,'Nov').replace(/^december/i,'Dec');
 }
 
-function extractExpCats(rows) {
-  const cats = {};
-  // Look for pivot table (col 8 = label, col 9 = sum of total)
-  for (let i = 1; i < rows.length; i++) {
-    const row = rows[i];
-    if (!row) continue;
-    const label = String(row[8] || '').trim();
-    const val = parseNum(row[9]);
-    if (label && label !== 'Row Labels' && label !== '(blank)' && label !== 'Grand Total' && label !== '' && val > 0) {
-      cats[label] = (cats[label] || 0) + val;
-    }
+function extractMonth(rows){
+  const d={sale:0,expense:0,profit:0,mulbhag:0,cash:0,transfer:0,expCats:{},daily:[]};
+  for(let i=1;i<Math.min(rows.length,40);i++){
+    const r=rows[i];if(!r||!r[0])continue;
+    const ds=String(r[0]);if(!/\d{4}/.test(ds))continue;
+    const total=pn(r[5]),profit=pn(r[1]),mulbhag=pn(r[2]),actual=pn(r[4]),cash=pn(r[6]),transfer=pn(r[7]);
+    if(total===0&&profit===0&&cash===0)continue;
+    let day=d.daily.length+1;
+    try{if(ds.includes('-'))day=parseInt(ds.split('-')[2])||day;else if(ds.includes('/'))day=parseInt(ds.split('/')[1])||day;}catch(e){}
+    d.daily.push({day,profit,mulbhag,actual,total,cash,transfer});
+    d.profit+=profit;d.mulbhag+=mulbhag;d.cash+=cash;d.transfer+=transfer;
   }
-  // Fallback: type of expense col (col 5) and total col (col 3)
-  if (Object.keys(cats).length === 0) {
-    for (let i = 1; i < rows.length; i++) {
-      const row = rows[i];
-      if (!row) continue;
-      const type = String(row[5] || '').trim();
-      const val = parseNum(row[3]);
-      if (type && type !== 'Type of Expense' && val > 0) {
-        cats[type] = (cats[type] || 0) + val;
-      }
+  for(let i=0;i<rows.length;i++){
+    const r=rows[i];if(!r)continue;
+    const c0=String(r[0]||'').trim();
+    if(c0==='Sale'&&r[1])d.sale=pn(r[1]);
+    if((c0==='Total'||c0==='Grand Total')&&r[3]&&i>40){const v=pn(r[3]);if(v>0)d.expense=v;}
+  }
+  if(d.sale===0&&d.daily.length>0)d.sale=d.daily.reduce((s,x)=>s+x.total,0);
+  return d;
+}
+
+function extractExpCats(rows){
+  const cats={};
+  for(let i=1;i<rows.length;i++){
+    const r=rows[i];if(!r)continue;
+    const lbl=String(r[8]||'').trim(),val=pn(r[9]);
+    if(lbl&&!['Row Labels','(blank)','Grand Total',''].includes(lbl)&&val>0)cats[lbl]=(cats[lbl]||0)+val;
+  }
+  if(!Object.keys(cats).length){
+    for(let i=1;i<rows.length;i++){
+      const r=rows[i];if(!r)continue;
+      const t=String(r[5]||'').trim(),v=pn(r[3]);
+      if(t&&t!=='Type of Expense'&&v>0)cats[t]=(cats[t]||0)+v;
     }
   }
   return cats;
 }
 
-function parseNum(v) {
-  if (v === null || v === undefined || v === '') return 0;
-  const n = parseFloat(String(v).replace(/[^0-9.\-]/g,''));
-  return isNaN(n) ? 0 : n;
-}
+function pn(v){if(v===null||v===undefined||v==='')return 0;const n=parseFloat(String(v).replace(/[^0-9.\-]/g,''));return isNaN(n)?0:n;}
 
-// ── SORT MONTHS ──
-function sortedMonths() {
-  return Object.keys(allData).sort((a, b) => {
-    const ai = MONTH_ORDER.indexOf(a);
-    const bi = MONTH_ORDER.indexOf(b);
-    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+// ── SORTED MONTHS ──
+function sortedMonths(){
+  return Object.keys(allData).sort((a,b)=>{
+    const ai=MONTH_ORDER.indexOf(a),bi=MONTH_ORDER.indexOf(b);
+    return(ai===-1?99:ai)-(bi===-1?99:bi);
   });
 }
 
-// ── SHOW DASHBOARD ──
-function showDashboard() {
-  document.getElementById('upload-screen').style.display = 'none';
-  document.getElementById('dashboard-screen').style.display = 'block';
+// ── SHOW APP ──
+function showApp(){
+  document.getElementById('upload-screen').style.display='none';
+  const app=document.getElementById('app');
+  app.style.display='flex';
   buildFilters();
-  const months = sortedMonths();
-  currentFilter = months[months.length - 1] || null;
-  setActiveFilterPill('month', currentFilter);
-  renderDashboard();
-}
-
-function resetToUpload() {
-  document.getElementById('dashboard-screen').style.display = 'none';
-  document.getElementById('upload-screen').style.display = 'flex';
-  allData = {};
-  Object.values(charts).forEach(c => c.destroy());
-  charts = {};
+  const months=sortedMonths();
+  currentFilter=months[months.length-1]||null;
+  setActivePill('month',currentFilter);
+  renderAll();
 }
 
 // ── FILTERS ──
-function buildFilters() {
-  const months = sortedMonths();
-
-  // Month pills
-  const mf = document.getElementById('month-filters');
-  mf.innerHTML = '';
-  months.forEach(m => {
-    const btn = document.createElement('button');
-    btn.className = 'filter-pill';
-    btn.textContent = m;
-    btn.dataset.month = m;
-    btn.onclick = () => { currentFilter = m; setActiveFilterPill('month', m); renderDashboard(); };
-    mf.appendChild(btn);
+function buildFilters(){
+  const months=sortedMonths();
+  const mf=document.getElementById('mf');mf.innerHTML='';
+  months.forEach(m=>{
+    const b=document.createElement('button');
+    b.className='fpill';b.textContent=m;b.dataset.month=m;
+    b.onclick=()=>{currentFilter=m;setActivePill('month',m);activeDetail=null;renderAll();};
+    mf.appendChild(b);
   });
-
-  // Quarter pills
-  const qf = document.getElementById('quarter-filters');
-  qf.innerHTML = '';
-  const quarters = getQuarters(months);
-  quarters.forEach(q => {
-    const btn = document.createElement('button');
-    btn.className = 'filter-pill';
-    btn.textContent = q.label;
-    btn.dataset.quarter = q.label;
-    btn.onclick = () => { currentFilter = q.label; setActiveFilterPill('quarter', q.label); renderDashboard(); };
-    qf.appendChild(btn);
+  const qf=document.getElementById('qf');qf.innerHTML='';
+  getQuarters(months).forEach(q=>{
+    const b=document.createElement('button');
+    b.className='fpill';b.textContent=q.label;b.dataset.q=q.label;
+    b.onclick=()=>{currentFilter=q.label;setActivePill('q',q.label);activeDetail=null;renderAll();};
+    qf.appendChild(b);
   });
 }
 
-function getQuarters(months) {
-  const seen = new Set();
-  return months.map(m => {
-    const parts = m.split(' ');
-    const year = parts[1];
-    const month = parts[0];
-    const qMap = { Jan:1,Feb:1,Mar:1,Apr:2,May:2,Jun:2,Jul:3,Aug:3,Sep:3,Oct:4,Nov:4,Dec:4 };
-    const q = qMap[month] || 1;
-    return { label: `Q${q} ${year}`, year, q };
-  }).filter(q => { if (seen.has(q.label)) return false; seen.add(q.label); return true; });
+function getQuarters(months){
+  const seen=new Set();
+  return months.map(m=>{
+    const[mon,yr]=m.split(' ');
+    const qm={Jan:1,Feb:1,Mar:1,Apr:2,May:2,Jun:2,Jul:3,Aug:3,Sep:3,Oct:4,Nov:4,Dec:4};
+    return{label:`Q${qm[mon]||1} ${yr}`};
+  }).filter(q=>{if(seen.has(q.label))return false;seen.add(q.label);return true;});
 }
 
-function getQuarterMonths(qLabel) {
-  const [q, year] = qLabel.split(' ');
-  const qNum = parseInt(q[1]);
-  const monthRanges = { 1:['Jan','Feb','Mar'], 2:['Apr','May','Jun'], 3:['Jul','Aug','Sep'], 4:['Oct','Nov','Dec'] };
-  return monthRanges[qNum].map(m => `${m} ${year}`).filter(m => allData[m]);
+function getQMonths(ql){
+  const[q,yr]=ql.split(' ');const qn=parseInt(q[1]);
+  const qr={1:['Jan','Feb','Mar'],2:['Apr','May','Jun'],3:['Jul','Aug','Sep'],4:['Oct','Nov','Dec']};
+  return qr[qn].map(m=>`${m} ${yr}`).filter(m=>allData[m]);
 }
 
-function setActiveFilterPill(type, value) {
-  document.querySelectorAll('.filter-pill[data-month]').forEach(b => b.classList.toggle('active', b.dataset.month === value));
-  document.querySelectorAll('.filter-pill[data-quarter]').forEach(b => b.classList.toggle('active', b.dataset.quarter === value));
+function setActivePill(type,val){
+  document.querySelectorAll('[data-month]').forEach(b=>b.classList.toggle('active',b.dataset.month===val));
+  document.querySelectorAll('[data-q]').forEach(b=>b.classList.toggle('active',b.dataset.q===val));
 }
 
-// View toggle
-document.querySelectorAll('[data-view]').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('[data-view]').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    currentView = btn.dataset.view;
-
-    const mf = document.getElementById('month-filters');
-    const qf = document.getElementById('quarter-filters');
-
-    if (currentView === 'monthly') {
-      mf.style.display = 'flex';
-      qf.style.display = 'none';
-      const months = sortedMonths();
-      currentFilter = months[months.length-1] || null;
-      setActiveFilterPill('month', currentFilter);
-    } else if (currentView === 'quarterly') {
-      mf.style.display = 'none';
-      qf.style.display = 'flex';
-      const quarters = getQuarters(sortedMonths());
-      currentFilter = quarters[quarters.length-1]?.label || null;
-      setActiveFilterPill('quarter', currentFilter);
-    } else {
-      mf.style.display = 'none';
-      qf.style.display = 'none';
-      currentFilter = null;
-    }
-
-    renderDashboard();
+document.querySelectorAll('[data-view]').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('[data-view]').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');currentView=btn.dataset.view;
+    const mf=document.getElementById('mf'),qf=document.getElementById('qf');
+    if(currentView==='monthly'){
+      mf.style.display='flex';qf.style.display='none';
+      const ms=sortedMonths();currentFilter=ms[ms.length-1]||null;setActivePill('month',currentFilter);
+    }else if(currentView==='quarterly'){
+      mf.style.display='none';qf.style.display='flex';
+      const qs=getQuarters(sortedMonths());currentFilter=qs[qs.length-1]?.label||null;setActivePill('q',currentFilter);
+    }else{mf.style.display='none';qf.style.display='none';currentFilter=null;}
+    activeDetail=null;renderAll();
   });
 });
 
-// ── RENDER ──
-function renderDashboard() {
-  const months = sortedMonths();
-  if (months.length === 0) return;
-
-  if (currentView === 'monthly') {
-    const m = currentFilter || months[months.length-1];
-    const d = allData[m];
-    if (!d) return;
-    renderKPIs([{ label: m, ...d }]);
-    renderMainChart(d.daily, m);
-    renderCashChart([d], [m]);
-    renderExpChart(d.expCats);
-    renderSummaryTable([{ label: m, ...d }]);
-    renderTrendChart(months, 'Monthly sale trend');
-  } else if (currentView === 'quarterly') {
-    const qMonths = currentFilter ? getQuarterMonths(currentFilter) : months;
-    const combined = aggregateMonths(qMonths);
-    renderKPIs([{ label: currentFilter || 'Quarter', ...combined }]);
-    renderMainChartMulti(qMonths);
-    renderCashChart(qMonths.map(m => allData[m]).filter(Boolean), qMonths);
-    renderExpChart(combined.expCats);
-    renderSummaryTable(qMonths.map(m => ({ label: m, ...allData[m] })));
-    renderTrendChart(months, 'Monthly sale trend');
-  } else {
-    // Yearly
-    const combined = aggregateMonths(months);
-    renderKPIs([{ label: 'Full year', ...combined }]);
-    renderMainChartMulti(months);
-    renderCashChart(months.map(m => allData[m]).filter(Boolean), months);
-    renderExpChart(combined.expCats);
-    renderSummaryTable(months.map(m => ({ label: m, ...allData[m] })));
-    renderTrendChart(months, 'Year overview');
-  }
+// ── AGGREGATE ──
+function agg(mList){
+  const o={sale:0,expense:0,profit:0,mulbhag:0,cash:0,transfer:0,expCats:{},daily:[]};
+  mList.forEach(m=>{
+    const d=allData[m];if(!d)return;
+    o.sale+=d.sale;o.expense+=d.expense;o.profit+=d.profit;o.mulbhag+=d.mulbhag;o.cash+=d.cash;o.transfer+=d.transfer;
+    o.daily=o.daily.concat(d.daily||[]);
+    Object.entries(d.expCats||{}).forEach(([k,v])=>o.expCats[k]=(o.expCats[k]||0)+v);
+  });
+  return o;
 }
 
-function aggregateMonths(mList) {
-  const out = { sale: 0, expense: 0, profit: 0, mulbhag: 0, cash: 0, transfer: 0, expCats: {}, daily: [] };
-  mList.forEach(m => {
-    const d = allData[m];
-    if (!d) return;
-    out.sale += d.sale;
-    out.expense += d.expense;
-    out.profit += d.profit;
-    out.mulbhag += d.mulbhag;
-    out.cash += d.cash;
-    out.transfer += d.transfer;
-    out.daily = out.daily.concat(d.daily || []);
-    Object.entries(d.expCats || {}).forEach(([k,v]) => { out.expCats[k] = (out.expCats[k]||0)+v; });
-  });
-  return out;
+function getActiveMonths(){
+  const months=sortedMonths();
+  if(currentView==='monthly')return[currentFilter||months[months.length-1]];
+  if(currentView==='quarterly')return currentFilter?getQMonths(currentFilter):months;
+  return months;
+}
+
+function getCurrentData(){const ml=getActiveMonths();return ml.length===1?(allData[ml[0]]||{}):agg(ml);}
+
+// ── RENDER ALL ──
+function renderAll(){
+  const months=sortedMonths();
+  const mList=getActiveMonths();
+  const data=getCurrentData();
+  renderKPIs(data);
+  renderProfitChart(data,mList);
+  renderTrendChart(months);
+  renderCashChart(data,mList);
+  renderExpChart(data.expCats);
+  renderWeekMini(data.daily);
+  if(activeDetail)showDetail(activeDetail);
 }
 
 // ── KPIs ──
-function renderKPIs(dataArr) {
-  const d = dataArr[0];
-  const net = d.sale - d.expense;
-  const kpis = [
-    { label: 'Total sale', value: fmt(d.sale), color: '#C4623A', sub: '' },
-    { label: 'Total expense', value: fmt(d.expense), color: '#B53C3C', cls: 'neg', sub: '' },
-    { label: 'Net (sale − exp)', value: (net >= 0 ? '' : '−') + fmt(Math.abs(net)), color: net >= 0 ? '#2D6A4F' : '#B53C3C', cls: net >= 0 ? 'pos' : 'neg', sub: '' },
-    { label: 'Gross profit', value: fmt(d.profit), color: '#2D6A4F', cls: 'pos', sub: '50% mulbhag: ' + fmt(d.mulbhag) },
-    { label: 'Cash collected', value: fmt(d.cash), color: '#1B4F8A', sub: '' },
-    { label: 'Online / transfer', value: fmt(d.transfer), color: '#534AB7', sub: '' },
+function renderKPIs(data){
+  const net=data.sale-data.expense;
+  const kpis=[
+    {l:'Total Sale',v:fmt(data.sale),kc:'#C4623A',key:'profit'},
+    {l:'Total Expense',v:fmt(data.expense),kc:'#B53C3C',cls:'neg',key:'exp'},
+    {l:'Net (Sale−Exp)',v:(net<0?'−':'')+fmt(Math.abs(net)),kc:net>=0?'#2D6A4F':'#B53C3C',cls:net>=0?'pos':'neg',key:'trend'},
+    {l:'Gross Profit',v:fmt(data.profit),kc:'#2D6A4F',cls:'pos',sub:'Mulbhag: ₹'+fmt(data.mulbhag),key:'week'},
+    {l:'Cash Collected',v:fmt(data.cash),kc:'#1B4F8A',key:'cash'},
+    {l:'Online/Transfer',v:fmt(data.transfer),kc:'#534AB7',key:'cash'},
   ];
-
-  const el = document.getElementById('kpi-section');
-  el.innerHTML = kpis.map(k => `
-    <div class="kpi" style="--kpi-color:${k.color}">
-      <div class="kpi-label">${k.label}</div>
-      <div class="kpi-value ${k.cls||''}">₹${k.value}</div>
-      ${k.sub ? `<div class="kpi-sub">${k.sub}</div>` : ''}
-    </div>
-  `).join('');
+  document.getElementById('kpi-row').innerHTML=kpis.map(k=>`
+    <div class="kpi ${activeDetail===k.key?'active':''}" style="--kc:${k.kc}" onclick="showDetail('${k.key}')">
+      <div class="kpi-lbl">${k.l}</div>
+      <div class="kpi-val ${k.cls||''}">₹${k.v}</div>
+      ${k.sub?`<div class="kpi-sub">${k.sub}</div>`:''}
+    </div>`).join('');
 }
 
-// ── MAIN CHART (daily) ──
-function renderMainChart(daily, label) {
-  document.getElementById('main-chart-title').textContent = 'Daily profit — ' + label;
-  document.getElementById('main-chart-meta').textContent = daily.length + ' days';
-  const days = daily.map(d => d.day);
-  const profits = daily.map(d => d.profit);
-  destroyChart('mainChart');
-  charts['mainChart'] = new Chart(document.getElementById('mainChart'), {
-    type: 'bar',
-    data: {
-      labels: days,
-      datasets: [{ label: 'Profit', data: profits, backgroundColor: '#C4623A', borderRadius: 3, borderSkipped: false }]
-    },
-    options: chartOpts({ yFmt: v => '₹' + kfmt(v), tooltipFmt: v => '₹' + v.toLocaleString('en-IN') })
-  });
+// ── CHART HELPERS ──
+function destroy(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
+function miniOpts(){return{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'₹'+c.raw.toLocaleString('en-IN')}}},scales:{x:{ticks:{color:'#9E9993',font:{size:8},maxRotation:0,autoSkip:true},grid:{color:'rgba(0,0,0,0.04)'}},y:{ticks:{color:'#9E9993',font:{size:8},callback:v=>'₹'+kfmt(v)},grid:{color:'rgba(0,0,0,0.04)'}}}};}
+
+// ── PROFIT CHART ──
+function renderProfitChart(data,mList){
+  destroy('profitChart');
+  const isM=mList.length>1;
+  const lbs=isM?mList:data.daily?.map(d=>d.day)||[];
+  const vals=isM?mList.map(m=>allData[m]?.profit||0):data.daily?.map(d=>d.profit)||[];
+  charts['profitChart']=new Chart(document.getElementById('profitChart'),{type:'bar',data:{labels:lbs,datasets:[{data:vals,backgroundColor:'#C4623A',borderRadius:2,borderSkipped:false}]},options:miniOpts()});
 }
 
-function renderMainChartMulti(mList) {
-  document.getElementById('main-chart-title').textContent = 'Monthly sale comparison';
-  document.getElementById('main-chart-meta').textContent = mList.length + ' months';
-  const labels = mList;
-  const sales = mList.map(m => allData[m]?.sale || 0);
-  const exps = mList.map(m => allData[m]?.expense || 0);
-  destroyChart('mainChart');
-  charts['mainChart'] = new Chart(document.getElementById('mainChart'), {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [
-        { label: 'Sale', data: sales, backgroundColor: '#C4623A', borderRadius: 3, borderSkipped: false },
-        { label: 'Expense', data: exps, backgroundColor: '#B4B2A9', borderRadius: 3, borderSkipped: false }
-      ]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: true, labels: { font: { family: 'DM Sans', size: 11 }, color: '#6B6660', boxWidth: 10, boxHeight: 10 } }, tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ₹' + ctx.raw.toLocaleString('en-IN') } } },
-      scales: {
-        x: { ticks: { color: '#9E9993', font: { size: 10 }, maxRotation: 30 }, grid: { color: 'rgba(0,0,0,0.04)' } },
-        y: { ticks: { color: '#9E9993', font: { size: 10 }, callback: v => '₹' + kfmt(v) }, grid: { color: 'rgba(0,0,0,0.04)' } }
-      }
-    }
+// ── TREND CHART ──
+function renderTrendChart(months){
+  destroy('trendChart');
+  charts['trendChart']=new Chart(document.getElementById('trendChart'),{
+    type:'line',
+    data:{labels:months,datasets:[
+      {label:'Sale',data:months.map(m=>allData[m]?.sale||0),borderColor:'#C4623A',backgroundColor:'rgba(196,98,58,0.1)',fill:true,tension:.35,pointRadius:2,borderWidth:1.5},
+      {label:'Exp',data:months.map(m=>allData[m]?.expense||0),borderColor:'#9E9993',fill:false,tension:.35,pointRadius:2,borderWidth:1.5,borderDash:[4,3]},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': ₹'+c.raw.toLocaleString('en-IN')}}},scales:{x:{ticks:{color:'#9E9993',font:{size:8},maxRotation:30},grid:{color:'rgba(0,0,0,0.04)'}},y:{ticks:{color:'#9E9993',font:{size:8},callback:v=>'₹'+kfmt(v)},grid:{color:'rgba(0,0,0,0.04)'}}}}
   });
 }
 
 // ── CASH CHART ──
-function renderCashChart(dataArr, labels) {
-  const cashVals = dataArr.map(d => d?.cash || 0);
-  const transferVals = dataArr.map(d => d?.transfer || 0);
-  destroyChart('cashChart');
-  charts['cashChart'] = new Chart(document.getElementById('cashChart'), {
-    type: 'bar',
-    data: {
-      labels: labels.length === 1 ? (dataArr[0]?.daily||[]).map(d=>d.day) : labels,
-      datasets: labels.length === 1
-        ? [
-            { label: 'Cash', data: (dataArr[0]?.daily||[]).map(d=>d.cash), backgroundColor: '#1B4F8A', borderRadius: 2, borderSkipped: false },
-            { label: 'Transfer', data: (dataArr[0]?.daily||[]).map(d=>d.transfer), backgroundColor: '#9FE1CB', borderRadius: 2, borderSkipped: false }
-          ]
-        : [
-            { label: 'Cash', data: cashVals, backgroundColor: '#1B4F8A', borderRadius: 2, borderSkipped: false },
-            { label: 'Transfer', data: transferVals, backgroundColor: '#9FE1CB', borderRadius: 2, borderSkipped: false }
-          ]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: true, labels: { font: { family:'DM Sans', size:11 }, color:'#6B6660', boxWidth:10, boxHeight:10 } }, tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ₹' + ctx.raw.toLocaleString('en-IN') } } },
-      scales: {
-        x: { stacked: true, ticks: { color:'#9E9993', font:{size:9}, maxRotation: 0 }, grid:{color:'rgba(0,0,0,0.04)'} },
-        y: { stacked: true, ticks: { color:'#9E9993', font:{size:10}, callback: v => '₹'+kfmt(v) }, grid:{color:'rgba(0,0,0,0.04)'} }
-      }
-    }
+function renderCashChart(data,mList){
+  destroy('cashChart');
+  const isM=mList.length>1;
+  const lbs=isM?mList:data.daily?.map(d=>d.day)||[];
+  const cD=isM?mList.map(m=>allData[m]?.cash||0):data.daily?.map(d=>d.cash)||[];
+  const tD=isM?mList.map(m=>allData[m]?.transfer||0):data.daily?.map(d=>d.transfer)||[];
+  charts['cashChart']=new Chart(document.getElementById('cashChart'),{
+    type:'bar',
+    data:{labels:lbs,datasets:[{label:'Cash',data:cD,backgroundColor:'#1B4F8A',borderRadius:2,borderSkipped:false},{label:'Online',data:tD,backgroundColor:'#9FE1CB',borderRadius:2,borderSkipped:false}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': ₹'+c.raw.toLocaleString('en-IN')}}},scales:{x:{stacked:true,ticks:{color:'#9E9993',font:{size:8},maxRotation:0,autoSkip:true},grid:{color:'rgba(0,0,0,0.04)'}},y:{stacked:true,ticks:{color:'#9E9993',font:{size:8},callback:v=>'₹'+kfmt(v)},grid:{color:'rgba(0,0,0,0.04)'}}}}
   });
 }
 
 // ── EXP CHART ──
-function renderExpChart(expCats) {
-  const entries = Object.entries(expCats || {}).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]).slice(0,8);
-  const labels = entries.map(e=>e[0]);
-  const vals = entries.map(e=>e[1]);
-  const colors = EXP_COLORS.slice(0, labels.length);
-  const total = vals.reduce((s,v)=>s+v,0);
-
-  const legendEl = document.getElementById('exp-legend');
-  legendEl.innerHTML = labels.map((l,i) => `
-    <div class="legend-item">
-      <span class="legend-dot" style="background:${colors[i]}"></span>
-      <span>${l}</span>
-    </div>
-  `).join('');
-
-  destroyChart('expChart');
-  charts['expChart'] = new Chart(document.getElementById('expChart'), {
-    type: 'doughnut',
-    data: { labels, datasets: [{ data: vals, backgroundColor: colors, borderWidth: 0 }] },
-    options: {
-      responsive: true, maintainAspectRatio: false, cutout: '60%',
-      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.label + ': ₹' + ctx.raw.toLocaleString('en-IN') + ' (' + Math.round(ctx.raw/total*100) + '%)' } } }
-    }
+function renderExpChart(ec){
+  const entries=Object.entries(ec||{}).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const lbs=entries.map(e=>e[0]),vals=entries.map(e=>e[1]),colors=EXP_COLORS.slice(0,lbs.length),tot=vals.reduce((s,v)=>s+v,0);
+  document.getElementById('exp-leg').innerHTML=lbs.slice(0,5).map((l,i)=>`<div class="li"><span class="ld" style="background:${colors[i]}"></span><span>${l}</span></div>`).join('');
+  destroy('expChart');
+  charts['expChart']=new Chart(document.getElementById('expChart'),{
+    type:'doughnut',data:{labels:lbs,datasets:[{data:vals,backgroundColor:colors,borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': ₹'+c.raw.toLocaleString('en-IN')+' ('+Math.round(c.raw/tot*100)+'%)'}}}}
   });
 }
 
-// ── SUMMARY TABLE ──
-function renderSummaryTable(rows) {
-  document.getElementById('table-title').textContent = currentView === 'monthly' ? 'Day summary' : (currentView === 'quarterly' ? 'Quarterly detail' : 'Yearly overview');
-  const isMulti = rows.length > 1;
-  const headers = isMulti
-    ? ['Period', 'Sale', 'Expense', 'Profit', 'Mulbhag', 'Net']
-    : ['Period', 'Sale', 'Expense', 'Profit', 'Cash', 'Net'];
-
-  let html = '<thead><tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr></thead><tbody>';
-  rows.forEach(d => {
-    const net = d.sale - d.expense;
-    const netClass = net >= 0 ? 'pos' : 'neg';
-    const row = isMulti
-      ? [d.label, fmtR(d.sale), fmtR(d.expense), fmtR(d.profit), fmtR(d.mulbhag), `<span class="${netClass}">${net<0?'−':''}₹${fmt(Math.abs(net))}</span>`]
-      : [d.label, fmtR(d.sale), fmtR(d.expense), fmtR(d.profit), fmtR(d.cash), `<span class="${netClass}">${net<0?'−':''}₹${fmt(Math.abs(net))}</span>`];
-    html += '<tr>' + row.map((v,i) => `<td>${i===0?v:v}</td>`).join('') + '</tr>';
-  });
-
-  // Totals row for multi
-  if (rows.length > 1) {
-    const totSale = rows.reduce((s,d)=>s+d.sale,0);
-    const totExp = rows.reduce((s,d)=>s+d.expense,0);
-    const totProfit = rows.reduce((s,d)=>s+d.profit,0);
-    const totMul = rows.reduce((s,d)=>s+d.mulbhag,0);
-    const totNet = totSale - totExp;
-    const netClass = totNet >= 0 ? 'pos' : 'neg';
-    html += `<tr><td>Total</td><td>${fmtR(totSale)}</td><td>${fmtR(totExp)}</td><td>${fmtR(totProfit)}</td><td>${fmtR(totMul)}</td><td><span class="${netClass}">${totNet<0?'−':''}₹${fmt(Math.abs(totNet))}</span></td></tr>`;
-  }
-
-  html += '</tbody>';
-  document.getElementById('summary-table').innerHTML = html;
-}
-
-// ── TREND CHART ──
-function renderTrendChart(months, title) {
-  document.getElementById('trend-title').textContent = title;
-  const sales = months.map(m => allData[m]?.sale || 0);
-  const exps = months.map(m => allData[m]?.expense || 0);
-  destroyChart('trendChart');
-  charts['trendChart'] = new Chart(document.getElementById('trendChart'), {
-    type: 'line',
-    data: {
-      labels: months,
-      datasets: [
-        { label: 'Sale', data: sales, borderColor: '#C4623A', backgroundColor: 'rgba(196,98,58,0.08)', fill: true, tension: 0.35, pointRadius: 4, pointBackgroundColor: '#C4623A', borderWidth: 2 },
-        { label: 'Expense', data: exps, borderColor: '#9E9993', backgroundColor: 'rgba(158,153,147,0.05)', fill: true, tension: 0.35, pointRadius: 4, pointBackgroundColor: '#9E9993', borderWidth: 1.5, borderDash: [4,3] }
-      ]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: true, labels: { font:{family:'DM Sans',size:11}, color:'#6B6660', boxWidth:10, boxHeight:10 } }, tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ₹' + ctx.raw.toLocaleString('en-IN') } } },
-      scales: {
-        x: { ticks: { color:'#9E9993', font:{size:10}, maxRotation: 30 }, grid:{color:'rgba(0,0,0,0.04)'} },
-        y: { ticks: { color:'#9E9993', font:{size:10}, callback: v => '₹'+kfmt(v) }, grid:{color:'rgba(0,0,0,0.04)'} }
-      }
-    }
+// ── WEEK MINI CHART ──
+function renderWeekMini(daily){
+  const wks=buildWeeks(daily||[]);
+  destroy('weekChart');
+  charts['weekChart']=new Chart(document.getElementById('weekChart'),{
+    type:'bar',
+    data:{labels:wks.map(w=>w.label),datasets:[
+      {label:'Sale',data:wks.map(w=>w.sale),backgroundColor:'#C4623A',borderRadius:2,borderSkipped:false},
+      {label:'Profit',data:wks.map(w=>w.profit),backgroundColor:'rgba(45,106,79,0.7)',borderRadius:2,borderSkipped:false},
+      {label:'Mulbhag',data:wks.map(w=>w.mulbhag),backgroundColor:'#B8862A',borderRadius:2,borderSkipped:false},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': ₹'+c.raw.toLocaleString('en-IN')}}},scales:{x:{ticks:{color:'#9E9993',font:{size:8}},grid:{color:'rgba(0,0,0,0.04)'}},y:{ticks:{color:'#9E9993',font:{size:8},callback:v=>'₹'+kfmt(v)},grid:{color:'rgba(0,0,0,0.04)'}}}}
   });
 }
 
-// ── HELPERS ──
-function destroyChart(id) {
-  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+// ── BUILD WEEKS ──
+function buildWeeks(daily){
+  return[{l:'Wk 1',d:[1,2,3,4,5,6,7]},{l:'Wk 2',d:[8,9,10,11,12,13,14]},{l:'Wk 3',d:[15,16,17,18,19,20,21]},{l:'Wk 4',d:[22,23,24,25,26,27,28]},{l:'Wk 5',d:[29,30,31]}].map(w=>{
+    const wd=daily.filter(d=>w.d.includes(d.day));if(!wd.length)return null;
+    return{label:w.l,range:wd[0].day+'–'+wd[wd.length-1].day,days:wd.length,sale:wd.reduce((s,d)=>s+d.total,0),actual:wd.reduce((s,d)=>s+d.actual,0),profit:wd.reduce((s,d)=>s+d.profit,0),mulbhag:wd.reduce((s,d)=>s+d.mulbhag,0),cash:wd.reduce((s,d)=>s+d.cash,0),transfer:wd.reduce((s,d)=>s+d.transfer,0)};
+  }).filter(Boolean);
 }
 
-function fmt(n) {
-  n = Math.round(n);
-  if (n >= 10000000) return (n/10000000).toFixed(1) + 'Cr';
-  if (n >= 100000) return (n/100000).toFixed(1) + 'L';
-  if (n >= 1000) return (n/1000).toFixed(1) + 'K';
-  return n.toLocaleString('en-IN');
+// ── SHOW DETAIL ──
+function showDetail(key){
+  if(activeDetail===key){activeDetail=null;clearDetail();highlightCards(null);renderKPIs(getCurrentData());return;}
+  activeDetail=key;highlightCards(key);renderKPIs(getCurrentData());
+  const mList=getActiveMonths(),data=getCurrentData(),months=sortedMonths();
+  let html='';
+  if(key==='profit')html=buildProfitDetail(data,mList);
+  else if(key==='exp')html=buildExpDetail(data.expCats);
+  else if(key==='cash')html=buildCashDetail(data,mList);
+  else if(key==='trend')html=buildTrendDetail(months);
+  else if(key==='week')html=buildWeekDetail(data.daily||[]);
+  else html=buildProfitDetail(data,mList);
+  document.getElementById('detail-inner').innerHTML=html;
+  document.getElementById('detail-panel').scrollTo({top:0,behavior:'smooth'});
 }
 
-function fmtR(n) { return '₹' + Math.round(n).toLocaleString('en-IN'); }
-function kfmt(n) {
-  if (n >= 100000) return (n/100000).toFixed(0) + 'L';
-  if (n >= 1000) return (n/1000).toFixed(0) + 'k';
-  return n;
+function clearDetail(){document.getElementById('detail-inner').innerHTML='<div class="empty">☝️ &nbsp;Click any chart or KPI card above to see full detail here</div>';}
+
+function highlightCards(key){
+  document.querySelectorAll('.cc').forEach(c=>c.classList.remove('active'));
+  const map={profit:'card-profit',exp:'card-exp',cash:'card-cash',trend:'card-trend',week:'card-week'};
+  if(key&&map[key])document.getElementById(map[key])?.classList.add('active');
 }
 
-function chartOpts({ yFmt, tooltipFmt }) {
-  return {
-    responsive: true, maintainAspectRatio: false,
-    plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => tooltipFmt(ctx.raw) } } },
-    scales: {
-      x: { ticks: { color:'#9E9993', font:{size:10}, maxRotation: 0, autoSkip: true }, grid:{color:'rgba(0,0,0,0.04)'} },
-      y: { ticks: { color:'#9E9993', font:{size:10}, callback: yFmt }, grid:{color:'rgba(0,0,0,0.04)'} }
-    }
-  };
+// ── DETAIL BUILDERS ──
+function buildProfitDetail(data,mList){
+  const isM=mList.length>1;
+  let html=`<div class="dtitle fade">📊 ${isM?'Monthly':'Daily'} Sale & Profit Breakdown <span class="badge">${isM?mList.join(' · '):mList[0]}</span></div><div class="tw"><table class="dt"><thead><tr><th>${isM?'Month':'Day'}</th><th>Total Sale</th><th>Actual</th><th>Profit</th><th>Mulbhag</th><th>Cash</th><th>Online</th></tr></thead><tbody>`;
+  let ts=0,ta=0,tp=0,tm=0,tc=0,ttr=0;
+  const rows=isM?mList.map(m=>{const d=allData[m]||{};return{lbl:m,sale:d.sale||0,actual:d.daily?.reduce((s,r)=>s+r.actual,0)||0,profit:d.profit||0,mulbhag:d.mulbhag||0,cash:d.cash||0,tr:d.transfer||0};}):
+    (data.daily||[]).map(d=>({lbl:'Day '+d.day,sale:d.total,actual:d.actual,profit:d.profit,mulbhag:d.mulbhag,cash:d.cash,tr:d.transfer}));
+  const maxSale=Math.max(...rows.map(r=>r.sale));
+  rows.forEach(r=>{
+    ts+=r.sale;ta+=r.actual;tp+=r.profit;tm+=r.mulbhag;tc+=r.cash;ttr+=r.tr;
+    html+=`<tr><td>${r.lbl}</td><td class="${r.sale===maxSale?'best':''}">${fmtR(r.sale)}</td><td>${fmtR(r.actual)}</td><td>${fmtR(r.profit)}</td><td>${fmtR(r.mulbhag)}</td><td>${fmtR(r.cash)}</td><td>${fmtR(r.tr)}</td></tr>`;
+  });
+  html+=`<tr><td>Total</td><td>${fmtR(ts)}</td><td>${fmtR(ta)}</td><td>${fmtR(tp)}</td><td>${fmtR(tm)}</td><td>${fmtR(tc)}</td><td>${fmtR(ttr)}</td></tr>`;
+  return html+'</tbody></table></div>';
 }
+
+function buildWeekDetail(daily){
+  const wks=buildWeeks(daily),mS=Math.max(...wks.map(w=>w.sale)),mP=Math.max(...wks.map(w=>w.profit));
+  let html=`<div class="dtitle fade">📅 Week-wise Breakdown <span class="badge">Sale · Actual · Profit · Mulbhag</span></div><div class="tw"><table class="dt"><thead><tr><th>Week</th><th>Days</th><th>Total Sale</th><th>Actual</th><th>Profit</th><th>Mulbhag</th><th>Cash</th><th>Online</th></tr></thead><tbody>`;
+  let ts=0,ta=0,tp=0,tm=0,tc=0,ttr=0,td=0;
+  wks.forEach(w=>{
+    ts+=w.sale;ta+=w.actual;tp+=w.profit;tm+=w.mulbhag;tc+=w.cash;ttr+=w.transfer;td+=w.days;
+    html+=`<tr><td><b>${w.label}</b> <span style="font-size:10px;color:var(--t3)">Day ${w.range}</span></td><td>${w.days}</td><td class="${w.sale===mS?'best':''}">${fmtR(w.sale)}</td><td>${fmtR(w.actual)}</td><td class="${w.profit===mP?'best':''}">${fmtR(w.profit)}</td><td>${fmtR(w.mulbhag)}</td><td>${fmtR(w.cash)}</td><td>${fmtR(w.transfer)}</td></tr>`;
+  });
+  html+=`<tr><td>Total</td><td>${td}</td><td>${fmtR(ts)}</td><td>${fmtR(ta)}</td><td>${fmtR(tp)}</td><td>${fmtR(tm)}</td><td>${fmtR(tc)}</td><td>${fmtR(ttr)}</td></tr>`;
+  return html+'</tbody></table></div>';
+}
+
+function buildExpDetail(ec){
+  const entries=Object.entries(ec||{}).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+  const tot=entries.reduce((s,[,v])=>s+v,0);
+  let html=`<div class="dtitle fade">💸 Expense Breakdown <span class="badge">by category</span></div><div class="tw"><table class="dt"><thead><tr><th>Category</th><th>Amount</th><th>Share</th></tr></thead><tbody>`;
+  entries.forEach(([k,v],i)=>{
+    html+=`<tr><td><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${EXP_COLORS[i]||'#ccc'};margin-right:6px;vertical-align:middle"></span>${k}</td><td>${fmtR(v)}</td><td>${tot>0?Math.round(v/tot*100):0}%</td></tr>`;
+  });
+  html+=`<tr><td>Total</td><td>${fmtR(tot)}</td><td>100%</td></tr>`;
+  return html+'</tbody></table></div>';
+}
+
+function buildCashDetail(data,mList){
+  const isM=mList.length>1;
+  let html=`<div class="dtitle fade">💰 Cash vs Online Detail <span class="badge">${isM?'by month':'by day'}</span></div><div class="tw"><table class="dt"><thead><tr><th>${isM?'Month':'Day'}</th><th>Cash</th><th>Online/Transfer</th><th>Total</th><th>Cash %</th></tr></thead><tbody>`;
+  const rows=isM?mList.map(m=>{const d=allData[m]||{};return{lbl:m,cash:d.cash||0,tr:d.transfer||0};}):
+    (data.daily||[]).map(d=>({lbl:'Day '+d.day,cash:d.cash,tr:d.transfer}));
+  let tc=0,ttr=0;
+  rows.forEach(r=>{
+    const tot=r.cash+r.tr;tc+=r.cash;ttr+=r.tr;
+    html+=`<tr><td>${r.lbl}</td><td>${fmtR(r.cash)}</td><td>${fmtR(r.tr)}</td><td>${fmtR(tot)}</td><td>${tot>0?Math.round(r.cash/tot*100):0}%</td></tr>`;
+  });
+  const tot=tc+ttr;
+  html+=`<tr><td>Total</td><td>${fmtR(tc)}</td><td>${fmtR(ttr)}</td><td>${fmtR(tot)}</td><td>${tot>0?Math.round(tc/tot*100):0}%</td></tr>`;
+  return html+'</tbody></table></div>';
+}
+
+function buildTrendDetail(months){
+  let html=`<div class="dtitle fade">📈 Monthly Sale vs Expense <span class="badge">all months</span></div><div class="tw"><table class="dt"><thead><tr><th>Month</th><th>Sale</th><th>Expense</th><th>Profit</th><th>Mulbhag</th><th>Net</th></tr></thead><tbody>`;
+  let ts=0,te=0,tp=0,tm=0;
+  months.forEach(m=>{
+    const d=allData[m]||{},s=d.sale||0,e=d.expense||0,p=d.profit||0,mu=d.mulbhag||0,net=s-e;
+    ts+=s;te+=e;tp+=p;tm+=mu;
+    html+=`<tr><td>${m}</td><td>${fmtR(s)}</td><td>${fmtR(e)}</td><td>${fmtR(p)}</td><td>${fmtR(mu)}</td><td class="${net>=0?'pos':'neg'}">${net<0?'−':''}${fmtR(Math.abs(net))}</td></tr>`;
+  });
+  const tn=ts-te;
+  html+=`<tr><td>Total</td><td>${fmtR(ts)}</td><td>${fmtR(te)}</td><td>${fmtR(tp)}</td><td>${fmtR(tm)}</td><td class="${tn>=0?'pos':'neg'}">${tn<0?'−':''}${fmtR(Math.abs(tn))}</td></tr>`;
+  return html+'</tbody></table></div>';
+}
+
+// ── FORMAT ──
+function fmt(n){n=Math.round(n);if(n>=10000000)return(n/10000000).toFixed(1)+'Cr';if(n>=100000)return(n/100000).toFixed(1)+'L';if(n>=1000)return(n/1000).toFixed(1)+'K';return n.toLocaleString('en-IN');}
+function fmtR(n){return'₹'+Math.round(n).toLocaleString('en-IN');}
+function kfmt(n){if(n>=100000)return(n/100000).toFixed(0)+'L';if(n>=1000)return(n/1000).toFixed(0)+'k';return n;}
 </script>
 </body>
 </html>

@@ -5,18 +5,14 @@
 <title>Sadhana Dashboard</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-<!-- Fonts -->
-<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-
-<!-- Libraries -->
+<!-- XLSX Library -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <style>
 body {
   margin: 0;
-  font-family: "DM Sans", sans-serif;
+  font-family: sans-serif;
   background: #f7f5f0;
-  color: #1a1814;
 }
 
 #upload-screen, #loading {
@@ -29,25 +25,21 @@ body {
 }
 
 button {
+  background: #c4623a;
+  color: white;
+  border: none;
   padding: 8px 18px;
   border-radius: 8px;
-  border: none;
-  background: #c4623a;
-  color: #fff;
   cursor: pointer;
-  font-weight: 500;
 }
 
-button:hover { background: #a04e2a; }
-
 .drop-zone {
-  width: 360px;
+  width: 340px;
   background: #fff;
   border: 2px dashed #bbb;
   border-radius: 14px;
-  padding: 22px;
+  padding: 20px;
   text-align: center;
-  cursor: pointer;
 }
 
 .drop-zone.drag-over {
@@ -57,11 +49,10 @@ button:hover { background: #a04e2a; }
 
 header {
   background: #fff;
-  border-bottom: 1px solid #ddd;
   padding: 10px 16px;
+  border-bottom: 1px solid #ddd;
   display: flex;
   justify-content: space-between;
-  align-items: center;
 }
 
 .badge {
@@ -72,13 +63,197 @@ header {
 }
 
 #app { display: none; }
-
-#content {
-  padding: 16px;
-}
 </style>
 </head>
 
 <body>
 
 <!-- LOADING -->
+<div id="loading" style="display:none;">
+  <div id="progress-text">Loading…</div>
+  <div style="width:220px;height:6px;background:#ddd;border-radius:5px;">
+    <div id="progress-bar"
+         style="height:100%;width:0%;background:#C4623A;border-radius:5px"></div>
+  </div>
+</div>
+
+<!-- UPLOAD -->
+<div id="upload-screen">
+  <h2>Sadhana Dashboard</h2>
+  <button onclick="loadFromGDrive()">Load from Google Drive</button>
+
+  <div class="drop-zone" id="drop-zone">
+    <input type="file" id="file-input" accept=".xlsx,.xls" hidden />
+    Drop Excel file here<br>or click to browse
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <header>
+    <b>Sadhana Dashboard</b>
+    <div class="badge" id="last-updated">⏱ Never updated</div>
+  </header>
+
+  <pre id="output" style="padding:16px;"></pre>
+</div>
+
+<script>
+// =====================================================
+// CONFIG
+// =====================================================
+const GDRIVE_API =
+  "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec"; // 🔴 REPLACE
+
+// =====================================================
+// SAFE BASE64 (NO STACK OVERFLOW)
+// =====================================================
+const CHUNK = 0x8000;
+
+function base64ToArrayBuffer(base64) {
+  const binary = atob(base64);
+  const len = binary.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
+}
+
+function arrayBufferToBase64(buffer) {
+  let binary = "";
+  const bytes = new Uint8Array(buffer);
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
+}
+
+// =====================================================
+// PROGRESS UI
+// =====================================================
+function showProgress(pct, text) {
+  document.getElementById("progress-bar").style.width = pct + "%";
+  document.getElementById("progress-text").textContent = text;
+}
+
+function showLoading(on) {
+  document.getElementById("loading").style.display = on ? "flex" : "none";
+}
+
+// =====================================================
+// HASH (VERSION CHECK)
+// =====================================================
+async function hashBuffer(buffer) {
+  const hash = await crypto.subtle.digest("SHA-256", buffer);
+  return [...new Uint8Array(hash)]
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+// =====================================================
+// CACHE (Safe)
+// =====================================================
+const MAX_MB = 4.5;
+
+function cacheWorkbook(buffer, name, hash) {
+  const b64 = arrayBufferToBase64(buffer);
+  if ((b64.length * 0.75) / (1024 * 1024) > MAX_MB) return;
+  localStorage.setItem("sadhana:data", b64);
+  localStorage.setItem("sadhana:name", name);
+  localStorage.setItem("sadhana:hash", hash);
+}
+
+function loadCachedWorkbook() {
+  const b64 = localStorage.getItem("sadhana:data");
+  if (!b64) return false;
+  const buffer = base64ToArrayBuffer(b64);
+  parseWorkbook(buffer, localStorage.getItem("sadhana:name") || "Cached");
+  return true;
+}
+
+// =====================================================
+// PARSER (HOOK INTO YOUR DASHBOARD)
+// =====================================================
+function parseWorkbook(buffer, name) {
+  const wb = XLSX.read(buffer, { type: "array", cellDates: true });
+  document.getElementById("output").textContent =
+    "Loaded file: " + name + "\nSheets:\n" + wb.SheetNames.join("\n");
+  document.getElementById("upload-screen").style.display = "none";
+  document.getElementById("app").style.display = "block";
+  document.getElementById("last-updated").textContent =
+    "⏱ " + new Date().toLocaleString();
+}
+
+// =====================================================
+// GOOGLE DRIVE LOAD
+// =====================================================
+async function loadFromGDrive() {
+  try {
+    showLoading(true);
+    showProgress(10, "Connecting…");
+
+    const res = await fetch(GDRIVE_API);
+    const json = await res.json();
+
+    showProgress(40, "Decoding…");
+    const buffer = base64ToArrayBuffer(json.data);
+    const newHash = await hashBuffer(buffer);
+
+    if (localStorage.getItem("sadhana:hash") === newHash) {
+      loadCachedWorkbook();
+      showLoading(false);
+      return;
+    }
+
+    showProgress(70, "Parsing Excel…");
+    parseWorkbook(buffer, json.filename);
+    cacheWorkbook(buffer, json.filename, newHash);
+
+    showProgress(100, "Done");
+  } catch (e) {
+    alert("Failed to load from Google Drive");
+    console.error(e);
+  } finally {
+    setTimeout(() => showLoading(false), 400);
+  }
+}
+
+// =====================================================
+// LOCAL FILE UPLOAD
+// =====================================================
+const dz = document.getElementById("drop-zone");
+const fi = document.getElementById("file-input");
+
+dz.onclick = () => fi.click();
+dz.ondragover = e => (e.preventDefault(), dz.classList.add("drag-over"));
+dz.ondragleave = () => dz.classList.remove("drag-over");
+dz.ondrop = e => {
+  e.preventDefault();
+  dz.classList.remove("drag-over");
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+};
+fi.onchange = e => handleFile(e.target.files[0]);
+
+function handleFile(file) {
+  if (!file) return;
+  const r = new FileReader();
+  showLoading(true);
+
+  r.onload = async e => {
+    const buffer = e.target.result;
+    const hash = await hashBuffer(buffer);
+    parseWorkbook(buffer, file.name);
+    cacheWorkbook(buffer, file.name, hash);
+    showLoading(false);
+  };
+
+  r.readAsArrayBuffer(file);
+}
+
+// =====================================================
+// AUTO LOAD CACHE
+// =====================================================
+window.onload = () => loadCachedWorkbook();
+</script>
+
+</body>
+</html>

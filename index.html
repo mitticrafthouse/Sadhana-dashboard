@@ -526,11 +526,8 @@ function extractMonth(rows){
     const total=pn(r[5]),profit=pn(r[1]),mulbhag=pn(r[2]),actual=pn(r[4]),cash=pn(r[6]),transfer=pn(r[7]);
     if(total===0&&profit===0&&cash===0)continue;
     let day=d.daily.length+1;
-    let dateStr=ds;
     try{if(ds.includes('-'))day=parseInt(ds.split('-')[2])||day;else if(ds.includes('/'))day=parseInt(ds.split('/')[1])||day;}catch(e){}
-    // Build a clean display date (DD MMM)
-    try{const pd=new Date(ds);if(!isNaN(pd)){dateStr=pd.getDate()+'/'+(pd.getMonth()+1)+'/'+pd.getFullYear();}}catch(e){}
-    d.daily.push({day,date:dateStr,dateRaw:ds,profit,mulbhag,actual,total,cash,transfer});
+    d.daily.push({day,profit,mulbhag,actual,total,cash,transfer});
     d.profit+=profit;d.mulbhag+=mulbhag;d.cash+=cash;d.transfer+=transfer;
   }
   for(let i=0;i<rows.length;i++){
@@ -667,42 +664,7 @@ document.querySelectorAll('[data-view]').forEach(btn=>{
   });
 });
 
-// ── MONTH DATE RANGE ──
-function getMonthBounds(monthLabel){
-  // monthLabel like "Jan 2026"
-  const parts=monthLabel.split(' ');
-  if(parts.length<2)return null;
-  const mMap={Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
-  const m=mMap[parts[0]],yr=parseInt(parts[1]);
-  if(m===undefined||isNaN(yr))return null;
-  const start=new Date(yr,m,1);
-  const end=new Date(yr,m+1,0); // last day of month
-  return{start,end};
-}
-
-function filterDailyByMonth(daily,monthLabel){
-  const bounds=getMonthBounds(monthLabel);
-  if(!bounds)return daily;
-  return (daily||[]).filter(d=>{
-    if(!d.dateRaw)return d.day>=1&&d.day<=31;
-    try{const pd=new Date(d.dateRaw);return pd>=bounds.start&&pd<=bounds.end;}catch(e){return true;}
-  });
-}
-
-function formatDayLabel(d){
-  // d has .date (DD/M/YYYY), .day, .dateRaw
-  if(d.date&&d.date!==d.dateRaw){
-    const parts=d.date.split('/');
-    if(parts.length===3){
-      const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-      const mo=months[parseInt(parts[1])-1]||'';
-      return parts[0]+' '+mo;
-    }
-  }
-  return d.day>0?d.day+' '+((d.dateRaw||'').split('-').slice(1,2).map(m=>{const mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return mo[parseInt(m)-1]||'';}).join('')):'Day '+d.day;
-}
-
-
+// ── AGGREGATE ──
 function agg(mList){
   const o={sale:0,expense:0,profit:0,mulbhag:0,cash:0,transfer:0,expCats:{},expItems:[],daily:[]};
   mList.forEach(m=>{
@@ -735,7 +697,7 @@ function renderAll(){
   renderCashChart(data,mList);
   renderExpChart(data.expCats);
   renderExpBar(data.expCats);
-  renderExpDaily(data.expItems, mList.length===1?mList[0]:null);
+  renderExpDaily(data.expItems);
   renderWeekMini(data.daily);
   if(activeDetail)showDetail(activeDetail);
 }
@@ -767,9 +729,8 @@ function miniOpts(){return{responsive:true,maintainAspectRatio:false,plugins:{le
 function renderProfitChart(data,mList){
   destroy('profitChart');
   const isM=mList.length>1;
-  const monthLabel=isM?null:mList[0];
-  const cleanDaily=(isM?(data.daily||[]):(filterDailyByMonth(data.daily,monthLabel))).filter(d=>d.day>=1&&d.day<=31).sort((a,b)=>a.day-b.day);
-  const lbs=isM?mList:cleanDaily.map(d=>formatDayLabel(d));
+  const cleanDaily=(data.daily||[]).filter(d=>d.day>=1&&d.day<=31).sort((a,b)=>a.day-b.day);
+  const lbs=isM?mList:cleanDaily.map(d=>d.day);
   const vals=isM?mList.map(m=>allData[m]?.profit||0):cleanDaily.map(d=>d.profit);
   charts['profitChart']=new Chart(document.getElementById('profitChart'),{type:'bar',data:{labels:lbs,datasets:[{data:vals,backgroundColor:'#C4623A',borderRadius:2,borderSkipped:false}]},options:miniOpts()});
 }
@@ -791,9 +752,8 @@ function renderTrendChart(months){
 function renderCashChart(data,mList){
   destroy('cashChart');
   const isM=mList.length>1;
-  const monthLabel=isM?null:mList[0];
-  const cleanDaily=(isM?(data.daily||[]):(filterDailyByMonth(data.daily,monthLabel))).filter(d=>d.day>=1&&d.day<=31).sort((a,b)=>a.day-b.day);
-  const lbs=isM?mList:cleanDaily.map(d=>formatDayLabel(d));
+  const cleanDaily=(data.daily||[]).filter(d=>d.day>=1&&d.day<=31).sort((a,b)=>a.day-b.day);
+  const lbs=isM?mList:cleanDaily.map(d=>d.day);
   const cD=isM?mList.map(m=>allData[m]?.cash||0):cleanDaily.map(d=>d.cash);
   const tD=isM?mList.map(m=>allData[m]?.transfer||0):cleanDaily.map(d=>d.transfer);
   charts['cashChart']=new Chart(document.getElementById('cashChart'),{
@@ -815,30 +775,15 @@ function renderExpBar(ec){
 }
 
 // ── EXP DAILY LINE CHART ──
-function renderExpDaily(expItems,monthLabel){
-  // Filter by month if single month selected
-  const bounds=monthLabel?getMonthBounds(monthLabel):null;
-  const filtered=(expItems||[]).filter(it=>{
-    if(!bounds)return it.day>0;
-    if(it.date&&it.date!=='NaN'){try{const pd=new Date(it.date);return pd>=bounds.start&&pd<=bounds.end&&it.day>0;}catch(e){}}
-    return it.day>0;
-  });
-  // Group by date label
+function renderExpDaily(expItems){
   const byDay={};
-  const dayLabel={};
-  filtered.forEach(it=>{
-    byDay[it.day]=(byDay[it.day]||0)+it.total;
-    if(it.date&&it.date!=='NaN'&&!dayLabel[it.day]){
-      try{const pd=new Date(it.date);if(!isNaN(pd)){const mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];dayLabel[it.day]=pd.getDate()+' '+mo[pd.getMonth()];}}catch(e){}
-    }
-    if(!dayLabel[it.day])dayLabel[it.day]='Day '+it.day;
-  });
+  (expItems||[]).forEach(it=>{if(it.day>0)byDay[it.day]=(byDay[it.day]||0)+it.total;});
   const days=Object.keys(byDay).map(Number).sort((a,b)=>a-b);
   destroy('expDailyChart');
   charts['expDailyChart']=new Chart(document.getElementById('expDailyChart'),{
     type:'line',
-    data:{labels:days.map(d=>dayLabel[d]),datasets:[{label:'Daily Expense',data:days.map(d=>byDay[d]),borderColor:'#B53C3C',backgroundColor:'rgba(181,60,60,0.08)',fill:true,tension:.35,pointRadius:2,borderWidth:1.5}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'₹'+c.raw.toLocaleString('en-IN')}}},scales:{x:{ticks:{color:'#9E9993',font:{size:8},maxRotation:45,autoSkip:true},grid:{color:'rgba(0,0,0,0.04)'}},y:{ticks:{color:'#9E9993',font:{size:8},callback:v=>'₹'+kfmt(v)},grid:{color:'rgba(0,0,0,0.04)'}}}}
+    data:{labels:days,datasets:[{label:'Daily Expense',data:days.map(d=>byDay[d]),borderColor:'#B53C3C',backgroundColor:'rgba(181,60,60,0.08)',fill:true,tension:.35,pointRadius:2,borderWidth:1.5}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'₹'+c.raw.toLocaleString('en-IN')}}},scales:{x:{ticks:{color:'#9E9993',font:{size:8},maxRotation:0,autoSkip:true},grid:{color:'rgba(0,0,0,0.04)'}},y:{ticks:{color:'#9E9993',font:{size:8},callback:v=>'₹'+kfmt(v)},grid:{color:'rgba(0,0,0,0.04)'}}}}
   });
 }
 function renderExpChart(ec){
@@ -884,7 +829,7 @@ function showDetail(key){
   let html='';
   if(key==='profit')html=buildProfitDetail(data,mList);
   else if(key==='exp'||key==='expbar')html=buildExpDetail(data.expCats);
-  else if(key==='expdetail')html=buildExpItemsDetail(data.expItems||[],mList.length===1?mList[0]:null);
+  else if(key==='expdetail')html=buildExpItemsDetail(data.expItems||[]);
   else if(key==='cash')html=buildCashDetail(data,mList);
   else if(key==='trend')html=buildTrendDetail(months);
   else if(key==='week')html=buildWeekDetail(data.daily||[]);
@@ -904,16 +849,14 @@ function highlightCards(key){
 // ── DETAIL BUILDERS ──
 function buildProfitDetail(data,mList){
   const isM=mList.length>1;
-  const monthLabel=isM?null:mList[0];
-  let html=`<div class="dtitle fade">📊 ${isM?'Monthly':'Daily'} Sale & Profit Breakdown <span class="badge">${isM?mList.join(' · '):mList[0]}</span></div><div class="tw"><table class="dt"><thead><tr><th>${isM?'Month':'Date'}</th><th>Total Sale</th><th>Actual</th><th>Profit</th><th>Mulbhag</th><th>Cash</th><th>Online</th></tr></thead><tbody>`;
+  let html=`<div class="dtitle fade">📊 ${isM?'Monthly':'Daily'} Sale & Profit Breakdown <span class="badge">${isM?mList.join(' · '):mList[0]}</span></div><div class="tw"><table class="dt"><thead><tr><th>${isM?'Month':'Day'}</th><th>Total Sale</th><th>Actual</th><th>Profit</th><th>Mulbhag</th><th>Cash</th><th>Online</th></tr></thead><tbody>`;
   let ts=0,ta=0,tp=0,tm=0,tc=0,ttr=0;
-  const rawDaily=isM?(data.daily||[]):(filterDailyByMonth(data.daily,monthLabel));
   const rows=isM
     ? mList.map(m=>{const d=allData[m]||{};return{lbl:m,sale:d.sale||0,actual:d.daily?.reduce((s,r)=>s+r.actual,0)||0,profit:d.profit||0,mulbhag:d.mulbhag||0,cash:d.cash||0,tr:d.transfer||0};})
-    : rawDaily
-        .filter(d=>d.day>=1&&d.day<=31)
+    : (data.daily||[])
+        .filter(d=>d.day>=1&&d.day<=31)  // ← filter out bad day values
         .sort((a,b)=>a.day-b.day)
-        .map(d=>({lbl:formatDayLabel(d),sale:d.total,actual:d.actual,profit:d.profit,mulbhag:d.mulbhag,cash:d.cash,tr:d.transfer}));
+        .map(d=>({lbl:'Day '+d.day,sale:d.total,actual:d.actual,profit:d.profit,mulbhag:d.mulbhag,cash:d.cash,tr:d.transfer}));
   const maxSale=rows.length?Math.max(...rows.map(r=>r.sale)):0;
   rows.forEach(r=>{
     ts+=r.sale;ta+=r.actual;tp+=r.profit;tm+=r.mulbhag;tc+=r.cash;ttr+=r.tr;
@@ -935,28 +878,17 @@ function buildWeekDetail(daily){
   return html+'</tbody></table></div>';
 }
 
-function buildExpItemsDetail(items,monthLabel){
-  const bounds=monthLabel?getMonthBounds(monthLabel):null;
-  const filtered=(items||[]).filter(it=>{
-    if(it.day<1||it.day>31)return false;
-    if(!bounds)return true;
-    if(it.date&&it.date!=='NaN'){try{const pd=new Date(it.date);return pd>=bounds.start&&pd<=bounds.end;}catch(e){}}
-    return true;
-  }).sort((a,b)=>a.day-b.day);
-  let html=`<div class="dtitle fade">🧾 All Expense Entries <span class="badge">${filtered.length} transactions</span></div>`;
-  html+=`<div class="tw"><table class="dt"><thead><tr><th>Date</th><th style="text-align:left">Remarks</th><th>Type</th><th>Cash</th><th>Online</th><th>Total</th></tr></thead><tbody>`;
+function buildExpItemsDetail(items){
+  const sorted=[...items].filter(it=>it.day>=1&&it.day<=31).sort((a,b)=>a.day-b.day);
+  let html=`<div class="dtitle fade">🧾 All Expense Entries <span class="badge">${sorted.length} transactions</span></div>`;
+  html+=`<div class="tw"><table class="dt"><thead><tr><th>Day</th><th style="text-align:left">Remarks</th><th>Type</th><th>Cash</th><th>Online</th><th>Total</th></tr></thead><tbody>`;
   let tc=0,ttr=0,tot=0;
   const typeColors={};
-  filtered.forEach(it=>{
+  sorted.forEach(it=>{
     if(!typeColors[it.type]) typeColors[it.type]=EXP_COLORS[Object.keys(typeColors).length%EXP_COLORS.length];
     tc+=it.cash;ttr+=it.transfer;tot+=it.total;
-    // Format date nicely
-    let dateLabel='Day '+it.day;
-    if(it.date&&it.date!=='NaN'){
-      try{const pd=new Date(it.date);if(!isNaN(pd)){const mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];dateLabel=pd.getDate()+' '+mo[pd.getMonth()]+' '+pd.getFullYear();}}catch(e){}
-    }
     html+=`<tr>
-      <td>${dateLabel}</td>
+      <td>Day ${it.day}</td>
       <td style="text-align:left;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${it.remarks||'—'}</td>
       <td><span style="display:inline-block;padding:1px 7px;border-radius:20px;font-size:10px;background:${typeColors[it.type]}22;color:${typeColors[it.type]};font-weight:500">${it.type}</span></td>
       <td>${it.cash>0?fmtR(it.cash):'—'}</td>
@@ -981,15 +913,22 @@ function buildExpDetail(ec){
 
 function buildCashDetail(data,mList){
   const isM=mList.length>1;
-  const monthLabel=isM?null:mList[0];
-  let html=`<div class="dtitle fade">💰 Cash vs Online Detail <span class="badge">${isM?'by month':'by day'}</span></div><div class="tw"><table class="dt"><thead><tr><th>${isM?'Month':'Date'}</th><th>Cash</th><th>Online/Transfer</th><th>Total</th><th>Cash %</th></tr></thead><tbody>`;
-  const rawDaily=isM?(data.daily||[]):(filterDailyByMonth(data.daily,monthLabel));
+  let html=`<div class="dtitle fade">💰 Cash vs Online Detail <span class="badge">${isM?'by month':'by day'}</span></div><div class="tw"><table class="dt"><thead><tr><th>${isM?'Month':'Day'}</th><th>Cash</th><th>Online/Transfer</th><th>Total</th><th>Cash %</th></tr></thead><tbody>`;
   const rows=isM
     ? mList.map(m=>{const d=allData[m]||{};return{lbl:m,cash:d.cash||0,tr:d.transfer||0};})
-    : rawDaily
+    : (data.daily||[])
         .filter(d=>d.day>=1&&d.day<=31)
         .sort((a,b)=>a.day-b.day)
-        .map(d=>({lbl:formatDayLabel(d),cash:d.cash,tr:d.transfer}));
+        .map(d=>({lbl:'Day '+d.day,cash:d.cash,tr:d.transfer}));
+  let tc=0,ttr=0;
+  rows.forEach(r=>{
+    const tot=r.cash+r.tr;tc+=r.cash;ttr+=r.tr;
+    html+=`<tr><td>${r.lbl}</td><td>${fmtR(r.cash)}</td><td>${fmtR(r.tr)}</td><td>${fmtR(tot)}</td><td>${tot>0?Math.round(r.cash/tot*100):0}%</td></tr>`;
+  });
+  const tot=tc+ttr;
+  html+=`<tr><td>Total</td><td>${fmtR(tc)}</td><td>${fmtR(ttr)}</td><td>${fmtR(tot)}</td><td>${tot>0?Math.round(tc/tot*100):0}%</td></tr>`;
+  return html+'</tbody></table></div>';
+}
   let tc=0,ttr=0;
   rows.forEach(r=>{
     const tot=r.cash+r.tr;tc+=r.cash;ttr+=r.tr;

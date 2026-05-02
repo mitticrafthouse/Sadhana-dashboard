@@ -659,25 +659,42 @@ function extractMonth(rows){
 }
 
 function extractExpCats(rows){
-  const cats={},items=[];
-  // Header: Date | Cash | Account Transfer | Total | Remarks | Type of Expense
-  // col0    col1   col2                    col3    col4      col5
+  const cats={}, items=[];
+
+  // ── PART 1: Detailed transaction rows (cols 0-5) for items table ──
+  // Header row 0: Date | Cash | Account Transfer | Total | Remarks | Type of Expense
   for(let i=1;i<rows.length;i++){
-    const r=rows[i];if(!r)continue;
+    const r=rows[i]; if(!r) continue;
     const dt=String(r[0]||'').trim();
     if(!dt||dt==='Date'||dt==='NaN'||dt==='') continue;
-    if(!/\d/.test(dt)) continue; // must contain a digit (date)
-    const cash=pn(r[1]),transfer=pn(r[2]);
-    const total=cash+transfer||pn(r[3]); // prefer cash+transfer; fallback to col3
+    if(!/\d/.test(dt)) continue;
+    const cash=pn(r[1]), transfer=pn(r[2]);
+    const total=cash+transfer>0 ? cash+transfer : pn(r[3]);
     const remarks=String(r[4]||'').trim();
     const type=String(r[5]||'').trim();
     if(!type||total===0) continue;
-    if(['type of expense','type','total','grand total'].includes(type.toLowerCase())) continue;
+    if(['type of expense','type','total','grand total','row labels'].includes(type.toLowerCase())) continue;
     let day=0;
     try{const pd=new Date(dt);if(!isNaN(pd))day=pd.getDate();}catch(e){}
-    cats[type]=(cats[type]||0)+total;
     items.push({day,date:dt,type,remarks,total,cash,transfer});
   }
+
+  // ── PART 2: Pivot summary table (col12=label, col13=total) for category chart ──
+  // Rows where col12 has a category name and col13 has a number
+  for(let i=0;i<rows.length;i++){
+    const r=rows[i]; if(!r) continue;
+    const lbl=String(r[12]||'').trim();
+    const val=pn(r[13]);
+    if(!lbl||val===0) continue;
+    if(['row labels','(blank)','grand total','sum of total',''].includes(lbl.toLowerCase())) continue;
+    cats[lbl]=(cats[lbl]||0)+val;
+  }
+
+  // Fallback: if no pivot found, build cats from items
+  if(!Object.keys(cats).length){
+    items.forEach(it=>{ cats[it.type]=(cats[it.type]||0)+it.total; });
+  }
+
   return{cats,items};
 }
 

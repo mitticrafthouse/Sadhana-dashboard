@@ -568,12 +568,34 @@ function parseWB(wb){
   wb.SheetNames.forEach(name=>{
     if(!/\d{4}/.test(name)||/expense/i.test(name)||!rx.test(name.trim())) return;
     const rows=XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,raw:false,dateNF:'yyyy-mm-dd'});
+
+    // Look for a dedicated expense sheet (e.g. "Apr 2026 Expense" or "Apr2026Expense")
     const expSheet=wb.SheetNames.find(s=>{
-      const a=s.replace(/\s/g,'').toLowerCase(),b=name.replace(/\s/g,'').toLowerCase();
-      return a===b+'expense'||a===b.replace('march','mar')+'expense';
+      const a=s.replace(/\s/g,'').toLowerCase();
+      const b=name.replace(/\s/g,'').toLowerCase();
+      return a===b+'expense' || a===b.replace('march','mar')+'expense'
+          || a===b+' expense'.replace(/\s/g,'') || s.toLowerCase().trim()===name.toLowerCase().trim()+' expense';
     });
+
     const md=extractMonth(rows);
-    if(expSheet){const er=XLSX.utils.sheet_to_json(wb.Sheets[expSheet],{header:1,raw:false});const ec=extractExpCats(er);md.expCats=ec.cats;md.expItems=ec.items;}
+
+    if(expSheet){
+      // Dedicated expense sheet found
+      const er=XLSX.utils.sheet_to_json(wb.Sheets[expSheet],{header:1,raw:false,dateNF:'yyyy-mm-dd'});
+      const ec=extractExpCats(er, 0);
+      md.expCats=ec.cats; md.expItems=ec.items;
+    } else {
+      // No separate sheet — expense data is embedded in the same month sheet
+      // Find the row where expense section starts (look for a "Date" header or expense-like rows after daily data)
+      const ec=extractExpCatsFromMonthSheet(rows);
+      md.expCats=ec.cats; md.expItems=ec.items;
+    }
+
+    // Also sum up expense from items if not already set
+    if(md.expense===0&&md.expItems&&md.expItems.length>0){
+      md.expense=md.expItems.reduce((s,it)=>s+it.total,0);
+    }
+
     if(md.sale>0||md.daily.length>0) allData[normLabel(name)]=md;
   });
 }
@@ -608,18 +630,16 @@ function extractMonth(rows){
   return d;
 }
 
-function extractExpCats(rows){
+function extractExpCats(rows, startRow=1){
   const cats={}, items=[];
-  // Read raw expense rows: col0=Date, col1=Cash, col2=Transfer, col3=Total, col4=Remarks, col5=Type
-  for(let i=1;i<rows.length;i++){
+  for(let i=startRow;i<rows.length;i++){
     const r=rows[i]; if(!r) continue;
     const dt=String(r[0]||'').trim();
+    if(!dt||dt==='Date'||dt==='NaN') continue;
     const total=pn(r[3]), cash=pn(r[1]), transfer=pn(r[2]);
     const remarks=String(r[4]||'').trim();
     const type=String(r[5]||'').trim();
-    if(!dt||!type||total===0||type==='Type of Expense') continue;
-    if(dt==='Date'||dt==='NaN') continue;
-    // Extract day from date
+    if(!type||total===0||type==='Type of Expense'||type==='Type') continue;
     let day=0;
     try{ const d=new Date(dt); if(!isNaN(d)) day=d.getDate(); }catch(e){}
     cats[type]=(cats[type]||0)+total;
@@ -633,6 +653,67 @@ function extractExpCats(rows){
       if(lbl&&!['Row Labels','(blank)','Grand Total',''].includes(lbl)&&val>0) cats[lbl]=(cats[lbl]||0)+val;
     }
   }
+  return {cats, items};
+}
+
+function extractExpCatsFromMonthSheet(rows){
+  // The month sheet has daily sales rows first, then expense rows below.
+  // Strategy: scan ALL rows for expense-like entries.
+  // An expense row has: col0=date, and one of col1/col2/col3=amount, col4=remarks, col5=type
+  // We detect expense rows by: col5 has a non-empty type string AND col3 has a number AND col0 is a date
+
+  const cats={}, items=[];
+
+  // First pass: look for a header row that signals expense section
+  // e.g. a row where col0="Date", col5="Type" or col5="Type of Expense"
+  let expStartRow = -1;
+  for(let i=0;i<rows.length;i++){
+    const r=rows[i]; if(!r) continue;
+    const c0=String(r[0]||'').trim().toLowerCase();
+    const c5=String(r[5]||'').trim().toLowerCase();
+    if((c0==='date')&&(c5==='type'||c5==='type of expense'||c5.includes('type'))){
+      expStartRow=i+1; break;
+    }
+  }
+
+  // If no header found, scan all rows for expense pattern
+  const scanFrom = expStartRow > 0 ? expStartRow : 0;
+
+  for(let i=scanFrom;i<rows.length;i++){
+    const r=rows[i]; if(!r) continue;
+    const dt=String(r[0]||'').trim();
+    if(!dt||dt==='Date'||dt==='NaN'||dt==='') continue;
+
+    // Must look like a date
+    const isDate=(/\d{4}/.test(dt))||(/^\d{1,2}[\/\-]\d{1,2}/.test(dt));
+    if(!isDate) continue;
+
+    const cash=pn(r[1]), transfer=pn(r[2]), total=pn(r[3]);
+    const remarks=String(r[4]||'').trim();
+    const type=String(r[5]||'').trim();
+
+    // Must have a type and a non-zero total
+    if(!type||type===''||total===0) continue;
+    // Skip header-like strings
+    if(['type','type of expense','total','grand total','sale'].includes(type.toLowerCase())) continue;
+    // Skip if it looks like a daily sales row (col1=profit,col2=mulbhag pattern — no type col)
+    // We trust: if col5 has a meaningful type string and col3>0, it's an expense row
+
+    let day=0;
+    try{ const d=new Date(dt); if(!isNaN(d)) day=d.getDate(); }catch(e){}
+    cats[type]=(cats[type]||0)+total;
+    items.push({day, date:dt, type, remarks, total, cash, transfer});
+  }
+
+  // Fallback: try pivot/summary table anywhere in sheet (cols 8-9)
+  if(!Object.keys(cats).length){
+    for(let i=0;i<rows.length;i++){
+      const r=rows[i]; if(!r) continue;
+      const lbl=String(r[8]||'').trim(), val=pn(r[9]);
+      if(lbl&&!['Row Labels','(blank)','Grand Total',''].includes(lbl)&&val>0) cats[lbl]=(cats[lbl]||0)+val;
+    }
+  }
+
   return {cats, items};
 }
 

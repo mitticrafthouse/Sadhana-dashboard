@@ -327,12 +327,20 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
 let allData={}, charts={}, currentView='monthly', currentFilter=null, activeDetail=null, dataSource='gdrive';
 
 const GDRIVE_FILE_ID = '1eW0-K4zR0eYmYc4eNi5LZE2jDZMQm8Hk';
-const GDRIVE_EXPORT  = `https://docs.google.com/spreadsheets/d/${GDRIVE_FILE_ID}/export?format=xlsx`;
 
-// Multiple CORS proxies — tries each in order until one works
+// Multiple URL formats for Google Drive — some work better than others
+const GDRIVE_URLS = [
+  `https://docs.google.com/spreadsheets/d/${GDRIVE_FILE_ID}/export?format=xlsx`,
+  `https://drive.google.com/uc?export=download&id=${GDRIVE_FILE_ID}`,
+  `https://docs.google.com/spreadsheets/d/${GDRIVE_FILE_ID}/export?format=xlsx&access_token=`,
+];
+
+// Multiple CORS proxies — tries each combination until one works
 const PROXIES = [
   url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
   url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+  url => `https://api.codetabs.com/v1/proxy?quest=${url}`,
   url => `https://thingproxy.freeboard.io/fetch/${url}`,
   url => `https://cors-anywhere.herokuapp.com/${url}`,
 ];
@@ -343,37 +351,58 @@ const EXP_COLORS=['#C4623A','#534AB7','#1D9E75','#B8862A','#D4537E','#378ADD','#
 window.addEventListener('DOMContentLoaded', ()=>{
   const isLocal = location.protocol === 'file:';
   if(isLocal){
-    setGDStatus('err','Host on Netlify or GitHub Pages to enable auto-load');
+    setGDStatus('err','Host on GitHub Pages to enable auto-load');
     document.getElementById('local-file-notice').style.display='block';
-    document.getElementById('share-help').style.display='none';
     document.getElementById('btn-gd-load').disabled=true;
-    document.getElementById('btn-gd-load').title='Cannot fetch from local file — host on Netlify/GitHub Pages';
-    return; // upload screen stays visible, local upload works fine
+    document.getElementById('btn-gd-load').title='Cannot fetch from local file — host on GitHub Pages';
+    return;
   }
-  // Hosted: auto-try GDrive but keep upload screen visible so user can upload manually if it fails
+  // Auto-load in background, keep upload screen usable throughout
   setGDStatus('loading','Connecting to Google Drive…');
-  setLoadingText('Loading from Google Drive…');
-  // Show a subtle loading indicator without hiding the upload screen
-  document.getElementById('gd-status').className='gc-status loading';
-  loadFromGDriveAuto();
+  const btn=document.getElementById('btn-gd-load');
+  btn.disabled=true;
+  btn.textContent='Loading…';
+  loadFromGDriveAuto().finally(()=>{
+    btn.disabled=false;
+    btn.textContent='Load from Google Drive';
+  });
 });
 
 async function loadFromGDriveAuto(){
-  // Silent auto-load: doesn't show full-screen loading overlay, keeps upload screen usable
   let arrayBuf=null;
-  try{
-    const res=await Promise.race([fetch(GDRIVE_EXPORT,{mode:'cors'}),new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),6000))]);
-    if(res.ok){const ct=res.headers.get('content-type')||'';if(!ct.includes('text/html')){const buf=await res.arrayBuffer();const h=new Uint8Array(buf.slice(0,2));if(h[0]===0x50&&h[1]===0x4B)arrayBuf=buf;}}
-  }catch(e){}
-  if(!arrayBuf){
-    for(const makeUrl of PROXIES){
+
+  async function tryFetch(url, timeout=8000){
+    const res=await Promise.race([
+      fetch(url,{cache:'no-store'}),
+      new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),timeout))
+    ]);
+    if(!res.ok) return null;
+    const buf=await res.arrayBuffer();
+    const h=new Uint8Array(buf.slice(0,4));
+    // Valid xlsx starts with PK (zip header)
+    if(h[0]===0x50&&h[1]===0x4B) return buf;
+    return null;
+  }
+
+  // Try every GDrive URL × every proxy combination
+  outer:
+  for(const gdUrl of GDRIVE_URLS){
+    // 1. Direct fetch first
+    try{
+      setGDStatus('loading','Connecting to Google Drive…');
+      const buf=await tryFetch(gdUrl,5000);
+      if(buf){arrayBuf=buf;break outer;}
+    }catch(e){}
+    // 2. Through each proxy
+    for(const makeProxy of PROXIES){
       try{
-        setGDStatus('loading','Connecting… (trying alternate route)');
-        const res=await Promise.race([fetch(makeUrl(GDRIVE_EXPORT)),new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),9000))]);
-        if(res.ok){const buf=await res.arrayBuffer();const h=new Uint8Array(buf.slice(0,2));if(h[0]===0x50&&h[1]===0x4B){arrayBuf=buf;break;}}
+        setGDStatus('loading','Trying alternate connection…');
+        const buf=await tryFetch(makeProxy(gdUrl),9000);
+        if(buf){arrayBuf=buf;break outer;}
       }catch(e){}
     }
   }
+
   if(arrayBuf){
     try{
       const wb=XLSX.read(arrayBuf,{type:'array',cellDates:true});
@@ -386,56 +415,40 @@ async function loadFromGDriveAuto(){
       setGDStatus('ok','Loaded · '+new Date().toLocaleTimeString());
       showApp();
     }catch(e){
-      setGDStatus('err','Loaded but could not parse. Upload manually below.');
-      document.getElementById('share-help').style.display='none';
+      setGDStatus('err','Downloaded but could not parse. Upload manually ↓');
     }
   } else {
-    setGDStatus('err','Could not auto-load. Upload manually below ↓');
+    setGDStatus('err','Auto-load failed. Upload your file below ↓');
     document.getElementById('share-help').style.display='block';
   }
 }
 
 async function loadFromGDrive(fromOverlay=false){
-  setGDStatus('loading','Loading from Google Drive…');
-  setLoadingText('Loading from Google Drive…');
+  setGDStatus('loading','Connecting to Google Drive…');
   document.getElementById('loading').style.display='flex';
+  setLoadingText('Loading from Google Drive…');
   document.getElementById('upload-screen').style.display='none';
   if(fromOverlay) closeOverlay();
 
-  let arrayBuf = null;
-  let lastErr  = null;
+  let arrayBuf=null;
 
-  // 1️⃣ Try direct fetch first
-  try {
-    const res = await Promise.race([
-      fetch(GDRIVE_EXPORT, {mode:'cors'}),
-      new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),6000))
+  async function tryFetch(url,timeout=8000){
+    const res=await Promise.race([
+      fetch(url,{cache:'no-store'}),
+      new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),timeout))
     ]);
-    if(res.ok){
-      const ct = res.headers.get('content-type')||'';
-      if(!ct.includes('text/html')){
-        const buf=await res.arrayBuffer();
-        const h=new Uint8Array(buf.slice(0,2));
-        if(h[0]===0x50&&h[1]===0x4B)arrayBuf=buf;
-      }
-    }
-  } catch(e){ lastErr=e; }
+    if(!res.ok)return null;
+    const buf=await res.arrayBuffer();
+    const h=new Uint8Array(buf.slice(0,4));
+    if(h[0]===0x50&&h[1]===0x4B)return buf;
+    return null;
+  }
 
-  // 2️⃣ Try each CORS proxy in sequence
-  if(!arrayBuf){
-    for(const makeUrl of PROXIES){
-      try{
-        setLoadingText('Connecting… (trying alternate route)');
-        const res = await Promise.race([
-          fetch(makeUrl(GDRIVE_EXPORT)),
-          new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),9000))
-        ]);
-        if(res.ok){
-          const buf = await res.arrayBuffer();
-          const header = new Uint8Array(buf.slice(0,2));
-          if(header[0]===0x50 && header[1]===0x4B){ arrayBuf=buf; break; }
-        }
-      }catch(e){ lastErr=e; }
+  outer:
+  for(const gdUrl of GDRIVE_URLS){
+    try{setLoadingText('Connecting to Google Drive…');const buf=await tryFetch(gdUrl,5000);if(buf){arrayBuf=buf;break outer;}}catch(e){}
+    for(const makeProxy of PROXIES){
+      try{setLoadingText('Trying alternate connection…');const buf=await tryFetch(makeProxy(gdUrl),9000);if(buf){arrayBuf=buf;break outer;}}catch(e){}
     }
   }
 
@@ -443,7 +456,7 @@ async function loadFromGDrive(fromOverlay=false){
 
   if(arrayBuf){
     try{
-      const wb = XLSX.read(arrayBuf,{type:'array',cellDates:true});
+      const wb=XLSX.read(arrayBuf,{type:'array',cellDates:true});
       parseWB(wb);
       dataSource='gdrive';
       document.getElementById('fname').textContent='Sadhana_Master_2026';
@@ -457,7 +470,6 @@ async function loadFromGDrive(fromOverlay=false){
       showGDriveError('File downloaded but could not be parsed. Please upload manually below.');
     }
   } else {
-    console.error('All fetch attempts failed:',lastErr);
     showGDriveError('Could not load from Google Drive. Make sure the file is shared as "Anyone with the link — Viewer".');
   }
 }
